@@ -2,16 +2,20 @@ package workspace
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+	"sync"
+
+	"github.com/alantheprice/ledit/pkg/types"
+
 	"github.com/alantheprice/ledit/pkg/config"
+	"github.com/alantheprice/ledit/pkg/fileanalyzer"
 	"github.com/alantheprice/ledit/pkg/llm"
 	"github.com/alantheprice/ledit/pkg/prompts" // Import the prompts package
 	"github.com/alantheprice/ledit/pkg/utils"   // Import the utils package for logger
-	"os"
-	"path/filepath" // New import for security concern detection
-	"regexp"        // New import for regex
-	"sort"          // For sorting top directories and string slices
-	"strings"
-	"sync"
 )
 
 // processResult is used to pass analysis results from goroutines back to the main thread.
@@ -19,15 +23,15 @@ type processResult struct {
 	relativePath            string
 	summary                 string
 	exports                 string
-	hash                    string
-	references              string
+	references              []string
 	tokenCount              int
-	securityConcerns        []string // New field
-	ignoredSecurityConcerns []string // New field
+	securityConcerns        []string
+	ignoredSecurityConcerns []string
 	err                     error
+	hash                    string // Added hash to processResult
 }
 
-// fileToProcess holds information about a file that needs to be analyzed by the LLM.
+// fileToProcess is a helper struct for files needing LLM analysis.
 type fileToProcess struct {
 	path         string
 	relativePath string
@@ -178,16 +182,16 @@ func stringSliceEqual(a, b []string) bool {
 
 // validateAndUpdateWorkspace checks the current file system against the workspace.json file,
 // analyzes new or changed files, removes deleted files, and saves the updated workspace.
-func validateAndUpdateWorkspace(rootDir, workspaceFilePath string, cfg *config.Config) (WorkspaceFile, error) {
+func validateAndUpdateWorkspace(rootDir, workspaceFilePath string, cfg *config.Config) (types.WorkspaceFile, error) {
 	logger := utils.GetLogger(cfg.SkipPrompt)
 
-	workspace, err := loadWorkspaceFile(workspaceFilePath)
+	workspace, err := LoadWorkspace(rootDir) // Use workspace_storage.LoadWorkspace
 	if err != nil {
 		if os.IsNotExist(err) {
 			logger.LogProcessStep("No existing workspace file found. Creating a new one.")
-			workspace = WorkspaceFile{Files: make(map[string]WorkspaceFileInfo)}
+			workspace = &types.WorkspaceFile{Files: make(map[string]types.FileInfo)} // Updated struct instantiation
 		} else {
-			return WorkspaceFile{}, fmt.Errorf("failed to load workspace file: %w", err)
+			return types.WorkspaceFile{}, fmt.Errorf("failed to load workspace file: %w", err)
 		}
 	}
 
@@ -245,7 +249,7 @@ func validateAndUpdateWorkspace(rootDir, workspaceFilePath string, cfg *config.C
 		}
 
 		fileContent := string(content)
-		newHash := generateFileHash(fileContent)
+		newHash := utils.GenerateFileHash(fileContent)
 
 		existingFileInfo, exists := workspace.Files[relativePath]
 		isChanged := exists && existingFileInfo.Hash != newHash
@@ -356,11 +360,11 @@ func validateAndUpdateWorkspace(rootDir, workspaceFilePath string, cfg *config.C
 				needsLLMSummarization = true
 			} else {
 				// If skipped due to security, update workspace info with placeholder summary
-				workspace.Files[relativePath] = WorkspaceFileInfo{
+				workspace.Files[relativePath] = types.FileInfo{ // Updated struct instantiation
 					Hash:                    newHash,
 					Summary:                 "Skipped due to confirmed security concerns.",
 					Exports:                 "",                              // Clear exports
-					References:              "",                              // Clear references
+					References:              []string{},                      // Clear references
 					TokenCount:              llm.EstimateTokens(fileContent), // Still estimate tokens
 					SecurityConcerns:        concernsForThisFile,
 					IgnoredSecurityConcerns: ignoredConcernsForThisFile,
@@ -374,7 +378,7 @@ func validateAndUpdateWorkspace(rootDir, workspaceFilePath string, cfg *config.C
 				!stringSliceEqual(existingFileInfo.IgnoredSecurityConcerns, ignoredConcernsForThisFile) {
 				logger.Logf("Updating security concerns for unchanged file %s.", relativePath)
 				// Preserve existing summary/exports/references if content is unchanged
-				workspace.Files[relativePath] = WorkspaceFileInfo{
+				workspace.Files[relativePath] = types.FileInfo{ // Updated struct instantiation
 					Hash:                    newHash,
 					Summary:                 existingFileInfo.Summary,
 					Exports:                 existingFileInfo.Exports,
@@ -397,11 +401,11 @@ func validateAndUpdateWorkspace(rootDir, workspaceFilePath string, cfg *config.C
 
 		if tokenCount > maxTokenCount {
 			logger.Logf("Skipping analysis of large file %s (%d tokens > %d). Adding as 'too large'.\n", relativePath, tokenCount, maxTokenCount)
-			workspace.Files[relativePath] = WorkspaceFileInfo{
+			workspace.Files[relativePath] = types.FileInfo{ // Updated struct instantiation
 				Hash:                    newHash,
 				Summary:                 "File is too large to analyze.",
 				Exports:                 "",
-				References:              "",
+				References:              []string{},
 				TokenCount:              tokenCount,
 				SecurityConcerns:        concernsForThisFile,
 				IgnoredSecurityConcerns: ignoredConcernsForThisFile,
@@ -431,7 +435,7 @@ func validateAndUpdateWorkspace(rootDir, workspaceFilePath string, cfg *config.C
 	})
 
 	if err != nil {
-		return workspace, err
+		return *workspace, err
 	}
 
 	// --- Warning and Confirmation for too many new files ---
@@ -457,7 +461,7 @@ func validateAndUpdateWorkspace(rootDir, workspaceFilePath string, cfg *config.C
 		)
 
 		if !logger.AskForConfirmation(warningMessage, true) { // this is a required confirmation and will exit if in a non-interactive mode
-			return WorkspaceFile{}, fmt.Errorf("workspace update cancelled by user due to too many new files")
+			return types.WorkspaceFile{}, fmt.Errorf("workspace update cancelled by user due to too many new files")
 		}
 	}
 	// --- End of Warning and Confirmation ---
@@ -474,12 +478,21 @@ func validateAndUpdateWorkspace(rootDir, workspaceFilePath string, cfg *config.C
 		go func(f fileToProcess, cfg *config.Config) {
 			defer wg.Done()
 
-			var fileSummary, fileExports, fileReferences string
+			var fileSummary, fileExports string
+			var fileReferences []string
 			var llmErr error
 
 			if len(f.content) > 0 {
 				logger.Logf("Analyzing %s for workspace...", f.path)
-				fileSummary, fileExports, fileReferences, llmErr = getSummary(f.content, f.path, cfg)
+				// Call the new fileanalyzer.GenerateFileSummary, passing llm.GetLLMResponse
+				fileInfo, err := fileanalyzer.GenerateFileSummary(llm.GetLLMResponse, f.content, f.path, cfg)
+				if err != nil {
+					llmErr = err
+				} else {
+					fileSummary = fileInfo.Summary
+					fileExports = fileInfo.Exports
+					fileReferences = fileInfo.References
+				}
 			}
 
 			resultsChan <- processResult{
@@ -489,8 +502,8 @@ func validateAndUpdateWorkspace(rootDir, workspaceFilePath string, cfg *config.C
 				references:              fileReferences,
 				hash:                    f.hash,
 				tokenCount:              f.tokenCount,
-				securityConcerns:        fileSecurityConcernsMap[f.relativePath],        // Retrieve from map
-				ignoredSecurityConcerns: fileIgnoredSecurityConcernsMap[f.relativePath], // Retrieve from map
+				securityConcerns:        fileSecurityConcernsMap[f.relativePath],
+				ignoredSecurityConcerns: fileIgnoredSecurityConcernsMap[f.relativePath],
 				err:                     llmErr,
 			}
 		}(file, cfg)
@@ -505,7 +518,7 @@ func validateAndUpdateWorkspace(rootDir, workspaceFilePath string, cfg *config.C
 		if result.err != nil {
 			logger.Logf("Warning: could not analyze file %s: %v. Proceeding with empty summary/exports.\n", result.relativePath, result.err)
 		}
-		workspace.Files[result.relativePath] = WorkspaceFileInfo{
+		workspace.Files[result.relativePath] = types.FileInfo{ // Updated struct instantiation
 			Hash:                    result.hash,
 			Summary:                 result.summary,
 			Exports:                 result.exports,
@@ -523,18 +536,18 @@ func validateAndUpdateWorkspace(rootDir, workspaceFilePath string, cfg *config.C
 		}
 	}
 
-	if err := saveWorkspaceFile(workspace, workspaceFilePath); err != nil {
-		return workspace, err
+	if err := SaveWorkspace(rootDir, workspace); err != nil { // Use workspace_storage.SaveWorkspace
+		return *workspace, err
 	}
 
-	return workspace, nil
+	return *workspace, nil
 }
 
 // GetWorkspaceContext orchestrates the workspace loading, analysis, and context generation process.
 func GetWorkspaceContext(instructions string, cfg *config.Config) string {
 	logger := utils.GetLogger(cfg.SkipPrompt)
 	logger.LogProcessStep("--- Loading in workspace data ---")
-	workspaceFilePath := "./.ledit/workspace.json"
+	workspaceFilePath := "./.ledit/workspace.json" // This path is used for logging/MkdirAll, but actual storage functions use rootDir
 
 	// If security checks are enabled, log the start of the check.
 	if cfg.EnableSecurityChecks {
@@ -546,6 +559,7 @@ func GetWorkspaceContext(instructions string, cfg *config.Config) string {
 		return ""
 	}
 
+	// validateAndUpdateWorkspace now handles LLM summarization internally by calling fileanalyzer.GenerateFileSummary
 	workspace, err := validateAndUpdateWorkspace("./", workspaceFilePath, cfg)
 	if err != nil {
 		logger.Logf("Error loading/updating content from WORKSPACE: %v. Continuing without it.\n", err)
@@ -553,11 +567,11 @@ func GetWorkspaceContext(instructions string, cfg *config.Config) string {
 	}
 
 	logger.LogProcessStep("--- Asking LLM to select relevant files for context ---")
-	fullContextFiles, summaryContextFiles, err := getFilesForContext(instructions, workspace, cfg)
+	fullContextFiles, summaryContextFiles, err := GetFilesForContext(instructions, &workspace, cfg) // Use workspace_selector.GetFilesForContext and pass pointer
 	if err != nil {
 		logger.Logf("Warning: could not determine which files to load for context: %v. Proceeding with all summaries.\n", err)
 		// If LLM fails to select files, provide the full file list but no specific full/summary context.
-		return getWorkspaceInfo(workspace, nil, nil)
+		return GetWorkspaceInfo(&workspace, nil, nil) // Pass pointer
 	}
 
 	if len(fullContextFiles) > 0 {
@@ -586,5 +600,5 @@ func GetWorkspaceContext(instructions string, cfg *config.Config) string {
 		}
 	}
 
-	return getWorkspaceInfo(workspace, fullContextFiles, summaryContextFiles)
+	return GetWorkspaceInfo(&workspace, fullContextFiles, summaryContextFiles) // Pass pointer
 }

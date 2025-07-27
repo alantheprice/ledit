@@ -2,14 +2,16 @@ package editor
 
 import (
 	"fmt"
-	"github.com/alantheprice/ledit/pkg/config"
-	"github.com/alantheprice/ledit/pkg/prompts" // Import the new prompts package
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/alantheprice/ledit/pkg/config"
+	"github.com/alantheprice/ledit/pkg/prompts" // Import the new prompts package
+	"github.com/alantheprice/ledit/pkg/types"   // New import for types.OrchestrationRequirement
 )
 
-func createAndRunSetupScript(req *OrchestrationRequirement, originalCfg *config.Config) error {
+func createAndRunSetupScript(req *types.OrchestrationRequirement, originalCfg *config.Config) error {
 	fmt.Println(prompts.GeneratingSetupScript()) // Use prompt
 	setupPrompt := fmt.Sprintf("You are an expert software developer. Your task is to write a setup script. "+
 		"An instruction has just been executed to modify the codebase. The instruction was: \"%s\" which primarily affected the file: \"%s\". "+
@@ -32,7 +34,7 @@ func createAndRunSetupScript(req *OrchestrationRequirement, originalCfg *config.
 
 	// Create a temporary config for this specific call to ProcessCodeGeneration
 	// to allow editing of setup.sh if the user didn't explicitly skip prompts for orchestration.
-	tempCfg := *originalCfg // Make a copy
+	tempCfg := *originalCfg      // Make a copy
 	if !originalCfg.SkipPrompt { // If the user *didn't* use --skip-prompt for orchestration
 		tempCfg.SkipPrompt = false // Allow prompting for setup.sh
 	}
@@ -89,7 +91,7 @@ func createAndRunSetupScript(req *OrchestrationRequirement, originalCfg *config.
 	return nil
 }
 
-func createAndRunValidationScript(req *OrchestrationRequirement, originalCfg *config.Config) error {
+func createAndRunValidationScript(req *types.OrchestrationRequirement, originalCfg *config.Config) error {
 	fmt.Println(prompts.GeneratingValidationScript()) // Use prompt
 	validationPrompt := fmt.Sprintf("You are an expert software developer. Your task is to write a validation script. "+
 		"An instruction has just been executed to modify the codebase. The instruction was: \"%s\" which primarily affected the file(s): \"%s\". "+
@@ -110,7 +112,7 @@ func createAndRunValidationScript(req *OrchestrationRequirement, originalCfg *co
 	}
 
 	// Create a temporary config for this specific call to ProcessCodeGeneration
-	tempCfg := *originalCfg // Make a copy
+	tempCfg := *originalCfg      // Make a copy
 	if !originalCfg.SkipPrompt { // If the user *didn't* use --skip-prompt for orchestration
 		tempCfg.SkipPrompt = false // Allow prompting for validate.sh
 	}

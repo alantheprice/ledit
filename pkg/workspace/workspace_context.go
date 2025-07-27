@@ -2,124 +2,89 @@ package workspace
 
 import (
 	"fmt"
-	"os"
-	"path/filepath" // Added for filepath.Ext
-	"sort"          // Added for sort.Strings
+	"path/filepath"
 	"strings"
+
+	"github.com/alantheprice/ledit/pkg/types" // Updated import
+	"github.com/alantheprice/ledit/pkg/utils"
 )
 
-// getWorkspaceInfo formats the workspace information for the LLM.
-// It lists all files, provides full content for selected files, and summaries for others.
-func getWorkspaceInfo(workspace WorkspaceFile, fullContextFiles, summaryContextFiles []string) string {
-	var b strings.Builder
-	b.WriteString("--- Start of full content from workspace ---\n")
+// GetWorkspaceInfo generates a formatted string containing workspace information.
+func GetWorkspaceInfo(workspace *types.WorkspaceFile, fullContextFiles, summaryContextFiles []string) string {
+	var sb strings.Builder
 
-	// Convert slices to maps for efficient lookup
-	fullContextMap := make(map[string]bool)
-	for _, f := range fullContextFiles {
-		fullContextMap[f] = true
-	}
+	sb.WriteString("--- Workspace File System Structure ---\n")
+	sb.WriteString(workspace.FileSystem.BaseFolderStructure) // Use BaseFolderStructure
+	sb.WriteString("\n")
 
-	summaryContextMap := make(map[string]bool)
-	for _, f := range summaryContextFiles {
-		summaryContextMap[f] = true
-	}
-
-	// 1. List all files in the workspace
-	b.WriteString("--- Workspace File System Structure ---\n")
-	var allFilePaths []string
-	for filePath := range workspace.Files {
-		allFilePaths = append(allFilePaths, filePath)
-	}
-	// Sort for consistent output
-	sort.Strings(allFilePaths)
-
-	for _, filePath := range allFilePaths {
-		b.WriteString(fmt.Sprintf("%s\n", filePath))
-	}
-	b.WriteString("\n")
-
-	// 2. Add selected file context
-	b.WriteString("--- Selected File Context ---\n\n")
-
-	// Full Context Files
-	b.WriteString("### Full Context Files:\n")
-	fullContextAdded := false
-	for _, filePath := range allFilePaths { // Iterate through all files to maintain order
-		if fullContextMap[filePath] {
-			fileInfo, exists := workspace.Files[filePath]
-			if !exists {
-				// This should ideally not happen if workspace is consistent
-				b.WriteString(fmt.Sprintf("Warning: File %s selected for full context not found in workspace.\n", filePath))
-				continue
+	if workspace.GitInfo.CurrentBranch != "" {
+		sb.WriteString("--- Git Repository Info ---\n")
+		sb.WriteString(fmt.Sprintf("Current Branch: %s\n", workspace.GitInfo.CurrentBranch))
+		sb.WriteString(fmt.Sprintf("Last Commit: %s\n", workspace.GitInfo.LastCommit))
+		sb.WriteString(fmt.Sprintf("Uncommitted Changes: %t\n", workspace.GitInfo.Uncommitted))
+		if len(workspace.GitInfo.Remotes) > 0 {
+			sb.WriteString("Remotes:\n")
+			for _, remote := range workspace.GitInfo.Remotes {
+				sb.WriteString(fmt.Sprintf("  - %s\n", remote))
 			}
-
-			if fileInfo.Summary == "File is too large to analyze." {
-				b.WriteString(fmt.Sprintf("Warning: File %s was selected for full context but is too large. Only summary provided:\n", filePath))
-				b.WriteString(fmt.Sprintf("Summary: %s\n", fileInfo.Summary))
-				if fileInfo.Exports != "" {
-					b.WriteString(fmt.Sprintf("Exports: %s\n", fileInfo.Exports))
-				}
-				if len(fileInfo.SecurityConcerns) > 0 { // New: Add security concerns
-					b.WriteString(fmt.Sprintf("Security Concerns: %s\n", strings.Join(fileInfo.SecurityConcerns, ", ")))
-				}
-				b.WriteString("\n")
-				fullContextAdded = true // Mark as added even if only summary is provided due to size
-				continue
-			}
-
-			content, err := os.ReadFile(filePath)
-			if err != nil {
-				b.WriteString(fmt.Sprintf("Warning: Could not read content for %s: %v. Skipping full context.\n", filePath, err))
-				continue
-			}
-
-			lang := getLanguageFromFilename(filePath)
-			b.WriteString(fmt.Sprintf("```%s #%s\n%s\n```END\n", lang, filePath, string(content))) // Added newline after code block
-			if len(fileInfo.SecurityConcerns) > 0 {                                                // New: Add security concerns
-				b.WriteString(fmt.Sprintf("Security Concerns: %s\n", strings.Join(fileInfo.SecurityConcerns, ", ")))
-			}
-			b.WriteString("\n") // Added newline after security concerns
-			fullContextAdded = true
 		}
-	}
-	if !fullContextAdded {
-		b.WriteString("No files selected for full context.\n\n")
+		sb.WriteString("\n")
 	}
 
-	// Summary Context Files
-	b.WriteString("### Summary Context Files:\n")
-	summaryContextAdded := false
-	for _, filePath := range allFilePaths { // Iterate through all files to maintain order
-		// Only add as summary if it wasn't already added as full context (or attempted as full context)
-		if summaryContextMap[filePath] && !fullContextMap[filePath] {
-			fileInfo, exists := workspace.Files[filePath]
-			if !exists {
-				b.WriteString(fmt.Sprintf("Warning: File %s selected for summary context not found in workspace.\n", filePath))
-				continue
-			}
-			b.WriteString(fmt.Sprintf("%s\n", filePath))
-			b.WriteString(fmt.Sprintf("Summary: %s\n", fileInfo.Summary))
-			if fileInfo.Exports != "" {
-				b.WriteString(fmt.Sprintf("Exports: %s\n", fileInfo.Exports))
-			}
-			if len(fileInfo.SecurityConcerns) > 0 { // New: Add security concerns
-				b.WriteString(fmt.Sprintf("Security Concerns: %s\n", strings.Join(fileInfo.SecurityConcerns, ", ")))
-			}
-			b.WriteString("\n")
-			summaryContextAdded = true
+	if len(workspace.IgnoredFiles) > 0 {
+		sb.WriteString("--- Ignored Files (by .leditignore) ---\n")
+		for _, ignored := range workspace.IgnoredFiles {
+			sb.WriteString(fmt.Sprintf("- %s\n", ignored))
 		}
+		sb.WriteString("\n")
 	}
-	if !summaryContextAdded {
-		b.WriteString("No files selected for summary context.\n\n")
+
+	if len(fullContextFiles) > 0 {
+		sb.WriteString("### Full Context Files:\n")
+		for _, file := range fullContextFiles {
+			fileInfo, exists := workspace.Files[file]
+			if exists && fileInfo.Summary != "File is too large to analyze." && fileInfo.Summary != "Skipped due to confirmed security concerns." {
+				content, err := utils.ReadFile(file)
+				if err != nil {
+					sb.WriteString(fmt.Sprintf("```error # %s\nCould not read file: %v\n```\n", file, err))
+					continue
+				}
+				sb.WriteString(fmt.Sprintf("```%s # %s\n%s\n```END\n", getLanguageFromFilename(file), file, content))
+			} else if exists && fileInfo.Summary == "Skipped due to confirmed security concerns." {
+				sb.WriteString(fmt.Sprintf("```text # %s\nSummary: %s\nSecurity Concerns: %s\n```END\n", file, fileInfo.Summary, strings.Join(fileInfo.SecurityConcerns, ", ")))
+			} else if exists && fileInfo.Summary == "File is too large to analyze." {
+				sb.WriteString(fmt.Sprintf("```text # %s\nSummary: %s\n```END\n", file, fileInfo.Summary))
+			} else {
+				sb.WriteString(fmt.Sprintf("```text # %s\nSummary: File not found in workspace or could not be analyzed.\n```END\n", file))
+			}
+		}
+		sb.WriteString("\n")
 	}
-	b.WriteString("--- End of full content from workspace ---\n")
-	return b.String()
+
+	if len(summaryContextFiles) > 0 {
+		sb.WriteString("### Summary Context Files:\n")
+		for _, file := range summaryContextFiles {
+			fileInfo, exists := workspace.Files[file]
+			if exists {
+				sb.WriteString(fmt.Sprintf("%s\nSummary: %s\nExports: %s\nReferences: %s\n", file, fileInfo.Summary, fileInfo.Exports, strings.Join(fileInfo.References, ", ")))
+				if len(fileInfo.SecurityConcerns) > 0 {
+					sb.WriteString(fmt.Sprintf("Security Concerns: %s\n", strings.Join(fileInfo.SecurityConcerns, ", ")))
+				}
+				sb.WriteString("\n")
+			} else {
+				sb.WriteString(fmt.Sprintf("%s\nSummary: File not found in workspace or could not be analyzed.\n\n", file))
+			}
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("--- End of full content from workspace ---\n")
+	return sb.String()
 }
 
-// getLanguageFromFilename infers the programming language from the file extension.
+// getLanguageFromFilename infers the programming language from a file's extension.
 func getLanguageFromFilename(filename string) string {
-	ext := strings.ToLower(filepath.Ext(filename))
+	ext := filepath.Ext(filename)
 	switch ext {
 	case ".go":
 		return "go"
@@ -143,22 +108,22 @@ func getLanguageFromFilename(filename string) string {
 		return "json"
 	case ".yaml", ".yml":
 		return "yaml"
+	case ".xml":
+		return "xml"
 	case ".html", ".htm":
 		return "html"
 	case ".css":
 		return "css"
-	case ".xml":
-		return "xml"
 	case ".sql":
 		return "sql"
 	case ".rb":
 		return "ruby"
+	case ".php":
+		return "php"
 	case ".swift":
 		return "swift"
 	case ".kt":
 		return "kotlin"
-	case ".scala":
-		return "scala"
 	case ".rs":
 		return "rust"
 	case ".dart":
@@ -172,6 +137,6 @@ func getLanguageFromFilename(filename string) string {
 	case ".toml":
 		return "toml"
 	default:
-		return "text"
+		return "text" // Default to plain text
 	}
 }

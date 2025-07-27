@@ -75,8 +75,9 @@ func processInstructions(instructions string, cfg *config.Config) (string, error
 	return instructions, nil
 }
 
-func getUpdatedCode(originalCode, instructions, filename string, cfg *config.Config) (map[string]string, string, error) {
-	modelName, llmContent, err := llm.GetLLMCodeResponse(cfg, originalCode, instructions, filename)
+func getUpdatedCode(originalCode, instructions, filename string, initialWorkspaceContext string, cfg *config.Config) (map[string]string, string, error) {
+	// Call the LLM with the prepared workspace context
+	modelName, llmContent, err := llm.GetLLMResponseWithInteractiveContext(originalCode, instructions, filename, initialWorkspaceContext, cfg)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get LLM response: %w", err)
 	}
@@ -214,9 +215,9 @@ func handleFileUpdates(updatedCode map[string]string, revisionID string, cfg *co
 	return nil
 }
 
-func getChangeSummaries(cfg *config.Config, newCode string, instructions string, newFilename string, reader *bufio.Reader) (string, string, string, error) {
-	note := "Changes made by ledit based on LLM suggestions."
-	description := ""
+func getChangeSummaries(cfg *config.Config, newCode string, instructions string, newFilename string, reader *bufio.Reader) (note, description, commit string, err error) {
+	note = "Changes made by ledit based on LLM suggestions."
+	description = ""
 	generatedDescription, err := llm.GetCommitMessage(cfg, newCode, instructions, newFilename)
 	if err == nil && generatedDescription != "" {
 		note, description, err := parseCommitMessage(generatedDescription, 0)
@@ -259,8 +260,38 @@ func ProcessCodeGeneration(filename, instructions string, cfg *config.Config) (s
 	}
 	fmt.Printf(prompts.ProcessedInstructionsSeparator(processedInstructions)) // Use prompt
 
+	// --- Start of Workspace Context Integration (Moved from llm/context_builder.go) ---
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current working directory: %w", err)
+	}
+
+	// Load existing workspace file or create a new one if it doesn't exist
+	ws, err := workspace.LoadWorkspace(cwd)
+	if err != nil {
+		return "", fmt.Errorf("failed to load workspace: %w", err)
+	}
+
+	// Update additional workspace context (git info, file system structure)
+	// This function is in workspace_manager.go and handles its own LLM calls for summarization.
+	ws, err = workspace.UpdateWorkspaceFile(ws, cfg)
+	if err != nil {
+		return "", fmt.Errorf("failed to update additional workspace context: %w", err)
+	}
+
+	// Select relevant files for full and summary context based on instructions
+	fullContextFiles, summaryContextFiles, err := workspace.GetFilesForContext(instructions, ws, cfg) // Pass ws (pointer) directly
+	if err != nil {
+		return "", fmt.Errorf("failed to select files for context: %w", err)
+	}
+
+	// Generate the full workspace context string for the LLM
+	workspaceContextString := workspace.GetWorkspaceInfo(ws, fullContextFiles, summaryContextFiles) // Call exported function
+	// --- End of Workspace Context Integration ---
+
 	requestHash := utils.GenerateRequestHash(processedInstructions)
-	updatedCodeFiles, llmResponseRaw, err := getUpdatedCode(originalCode, processedInstructions, filename, cfg)
+	// Call the LLM with the prepared workspace context
+	updatedCodeFiles, llmResponseRaw, err := getUpdatedCode(originalCode, processedInstructions, filename, workspaceContextString, cfg)
 	if err != nil {
 		return "", err
 	}

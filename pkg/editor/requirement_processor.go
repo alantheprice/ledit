@@ -2,14 +2,16 @@ package editor
 
 import (
 	"fmt"
-	"github.com/alantheprice/ledit/pkg/config"
-	"github.com/alantheprice/ledit/pkg/llm"
-	"github.com/alantheprice/ledit/pkg/prompts"
-	"github.com/alantheprice/ledit/pkg/utils"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/alantheprice/ledit/pkg/config"
+	"github.com/alantheprice/ledit/pkg/llm"
+	"github.com/alantheprice/ledit/pkg/prompts"
+	"github.com/alantheprice/ledit/pkg/types"
+	"github.com/alantheprice/ledit/pkg/utils"
 )
 
 type RequirementProcessor struct {
@@ -20,7 +22,7 @@ func NewRequirementProcessor(cfg *config.Config) *RequirementProcessor {
 	return &RequirementProcessor{cfg: cfg}
 }
 
-func (p *RequirementProcessor) Process(plan *OrchestrationPlan) error {
+func (p *RequirementProcessor) Process(plan *types.OrchestrationPlan) error {
 	logger := utils.GetLogger(true) // Get the logger instance
 	execCfg := *p.cfg
 	execCfg.SkipPrompt = true
@@ -61,7 +63,7 @@ func (p *RequirementProcessor) Process(plan *OrchestrationPlan) error {
 			if err != nil {
 				req.Status = "failed"
 				req.LastLLMResponse = ""
-				saveOrchestrationPlan(plan)
+				_ = saveOrchestrationPlan(plan)                                            // Save plan even on processInstructions error
 				logger.LogProcessStep(prompts.ProcessInstructionFailed(req.Filepath, err)) // Use prompt
 				return fmt.Errorf("failed to process instruction for file %s: %v", req.Filepath, err)
 			}
@@ -70,7 +72,7 @@ func (p *RequirementProcessor) Process(plan *OrchestrationPlan) error {
 			if err != nil {
 				req.Status = "failed"
 				req.LastLLMResponse = diffForTargetFile
-				saveOrchestrationPlan(plan)
+				_ = saveOrchestrationPlan(plan)                                            // Save plan even on ProcessCodeGeneration error
 				logger.LogProcessStep(prompts.ProcessRequirementFailed(req.Filepath, err)) // Use prompt
 				return fmt.Errorf("failed to process requirement for file %s: %w", req.Filepath, err)
 			}
@@ -80,7 +82,10 @@ func (p *RequirementProcessor) Process(plan *OrchestrationPlan) error {
 				req.Status = "completed"
 				req.ValidationFailureContext = ""
 				req.LastLLMResponse = ""
-				saveOrchestrationPlan(plan)
+				if err := saveOrchestrationPlan(plan); err != nil { // Save plan on completion
+					logger.LogProcessStep(prompts.SaveProgressFailed(req.Filepath, err)) // Use prompt
+					return fmt.Errorf("step for %s completed, but failed to save progress: %w", req.Filepath, err)
+				}
 				break
 			}
 
@@ -90,12 +95,20 @@ func (p *RequirementProcessor) Process(plan *OrchestrationPlan) error {
 				req.Status = "failed"
 				req.ValidationFailureContext = prompts.ValidationFailureContextSetupScriptFailed(setupErr) // Use prompt
 				req.LastLLMResponse = diffForTargetFile
-				saveOrchestrationPlan(plan)
+				_ = saveOrchestrationPlan(plan) // Save plan on setup script failure
 				lastValidationErr = setupErr
 				continue
 			}
 
 			lastValidationErr = createAndRunValidationScript(req, &execCfg)
+			if lastValidationErr != nil {
+				req.Status = "failed"
+				req.ValidationFailureContext = lastValidationErr.Error() // Store the error message
+				req.LastLLMResponse = diffForTargetFile
+				_ = saveOrchestrationPlan(plan) // Save plan on validation script failure
+				continue
+			}
+
 			req.Status = "completed"
 			req.ValidationFailureContext = ""
 			req.LastLLMResponse = ""
@@ -117,7 +130,7 @@ func (p *RequirementProcessor) Process(plan *OrchestrationPlan) error {
 	return nil
 }
 
-func (p *RequirementProcessor) getFullInstructionForRequirement(req *OrchestrationRequirement) string {
+func (p *RequirementProcessor) getFullInstructionForRequirement(req *types.OrchestrationRequirement) string {
 	if strings.Contains(req.Filepath, ".") && testableFileTypes()[filepath.Ext(req.Filepath)] {
 		return fmt.Sprintf(
 			"As a TDD developer, you should write tests and write the associated code to accomplish the requirements: '%s'",
@@ -132,7 +145,7 @@ func (p *RequirementProcessor) getFullInstructionForRequirement(req *Orchestrati
 	return req.Instruction
 }
 
-func (p *RequirementProcessor) getCurrentInstructionForAttempt(req *OrchestrationRequirement, fullInstruction string) string {
+func (p *RequirementProcessor) getCurrentInstructionForAttempt(req *types.OrchestrationRequirement, fullInstruction string) string {
 	logger := utils.GetLogger(true) // Get the logger instance for this method too
 	if req.ValidationFailureContext != "" {
 		re := regexp.MustCompile(`(?i)\s*#WS\s*$`)

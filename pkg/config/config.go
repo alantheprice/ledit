@@ -22,18 +22,19 @@ const (
 )
 
 type Config struct {
-	EditingModel             string `json:"editing_model"`
-	SummaryModel             string `json:"summary_model"`
-	OrchestrationModel       string `json:"orchestration_model"` // new field for orchestration tasks
-	WorkspaceModel           string `json:"workspace_model"`     // New field for workspace analysis
-	EmbeddingModel           string `json:"embedding_model"`     // New field for embeddings
-	LocalModel               string `json:"local_model"`
-	TrackWithGit             bool   `json:"track_with_git"`
-	EnableSecurityChecks     bool   `json:"enable_security_checks"` // New field for security checks
-	SkipPrompt               bool   `json:"-"`                      // Internal use, not saved to config
-	Interactive              bool   `json:"-"`                      // Internal use, not saved to config
-	OllamaServerURL          string `json:"ollama_server_url"`
-	OrchestrationMaxAttempts int    `json:"orchestration_max_attempts"` // New field for max attempts
+	EditingModel             string          `json:"editing_model"`
+	SummaryModel             string          `json:"summary_model"`
+	OrchestrationModel       string          `json:"orchestration_model"` // new field for orchestration tasks
+	WorkspaceModel           string          `json:"workspace_model"`     // New field for workspace analysis
+	EmbeddingModel           string          `json:"embedding_model"`     // New field for embeddings
+	LocalModel               string          `json:"local_model"`
+	TrackWithGit             bool            `json:"track_with_git"`
+	EnableSecurityChecks     bool            `json:"enable_security_checks"` // New field for security checks
+	SkipPrompt               bool            `json:"-"`                      // Internal use, not saved to config
+	Interactive              bool            `json:"-"`                      // Internal use, not saved to config
+	OllamaServerURL          string          `json:"ollama_server_url"`
+	OrchestrationMaxAttempts int             `json:"orchestration_max_attempts"` // New field for max attempts
+	ModelTokenLimits         map[string]int  `json:"model_token_limits"`         // New field for model-specific token limits
 }
 
 func getHomeConfigPath() (string, string) {
@@ -105,6 +106,39 @@ func (cfg *Config) setDefaultValues() {
 	}
 	// Ensure EnableSecurityChecks is explicitly set to false if not present in loaded config
 	cfg.EnableSecurityChecks = true
+
+	// Initialize ModelTokenLimits if nil
+	if cfg.ModelTokenLimits == nil {
+		cfg.ModelTokenLimits = make(map[string]int)
+	}
+	// Set default token limits if not already present
+	if _, ok := cfg.ModelTokenLimits["default"]; !ok {
+		cfg.ModelTokenLimits["default"] = 40000 // Global default
+	}
+	if _, ok := cfg.ModelTokenLimits["lambda-ai:deepseek-v3-0324"]; !ok {
+		cfg.ModelTokenLimits["lambda-ai:deepseek-v3-0324"] = 128000
+	}
+	if _, ok := cfg.ModelTokenLimits["lambda-ai:llama3.1-8b-instruct"]; !ok {
+		cfg.ModelTokenLimits["lambda-ai:llama3.1-8b-instruct"] = 131072
+	}
+	if _, ok := cfg.ModelTokenLimits["lambda-ai:deepseek-llama3.3-70b"]; !ok {
+		cfg.ModelTokenLimits["lambda-ai:deepseek-llama3.3-70b"] = 131072
+	}
+	if _, ok := cfg.ModelTokenLimits["lambda-ai:qwen25-coder-32b-instruct"]; !ok {
+		cfg.ModelTokenLimits["lambda-ai:qwen25-coder-32b-instruct"] = 32768
+	}
+	if _, ok := cfg.ModelTokenLimits["ollama:qwen2.5-coder:32b"]; !ok {
+		cfg.ModelTokenLimits["ollama:qwen2.5-coder:32b"] = 32768
+	}
+	if _, ok := cfg.ModelTokenLimits["ollama:qwen2.5-coder:14b"]; !ok {
+		cfg.ModelTokenLimits["ollama:qwen2.5-coder:14b"] = 16384
+	}
+	if _, ok := cfg.ModelTokenLimits["ollama:qwen2.5-coder:7b"]; !ok {
+		cfg.ModelTokenLimits["ollama:qwen2.5-coder:7b"] = 8192
+	}
+	if _, ok := cfg.ModelTokenLimits["ollama:qwen2.5-coder:3b"]; !ok {
+		cfg.ModelTokenLimits["ollama:qwen2.5-coder:3b"] = 4096
+	}
 }
 
 func loadConfig(filePath string) (*Config, error) {
@@ -118,6 +152,7 @@ func loadConfig(filePath string) (*Config, error) {
 	cfg.WorkspaceModel = ""                        // Default to empty, will fall back to SummaryModel
 	cfg.OllamaServerURL = "http://localhost:11434" // Default Ollama URL
 	cfg.EnableSecurityChecks = false               // Default to false for existing configs
+	cfg.ModelTokenLimits = make(map[string]int)   // Initialize map to avoid nil pointer
 
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, err
@@ -190,6 +225,7 @@ func createConfig(filePath string, skipPrompt bool) (*Config, error) {
 		OllamaServerURL:          "http://localhost:11434",
 		EmbeddingModel:           "mxbai-embed-large", // Default embedding model
 		OrchestrationMaxAttempts: 6,                   // Default max attempts for orchestration
+		ModelTokenLimits:         make(map[string]int),
 	}
 
 	cfg.setDefaultValues()

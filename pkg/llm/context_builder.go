@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/alantheprice/ledit/pkg/config"
-	"github.com/alantheprice/ledit/pkg/prompts" // Import the new prompts package
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/alantheprice/ledit/pkg/config"
+	"github.com/alantheprice/ledit/pkg/prompts" // Import the new prompts package
 )
 
 // --- Message Structs ---
@@ -95,11 +96,20 @@ func handleContextRequest(reqs []ContextRequest, cfg *config.Config) (string, er
 	return strings.Join(responses, "\n"), nil
 }
 
-func GetLLMCodeResponse(cfg *config.Config, code, instructions, filename string) (string, string, error) {
+// GetLLMResponseWithInteractiveContext gets an LLM response, handling interactive context requests.
+// It receives the initial workspace context string, rather than building it itself.
+func GetLLMResponseWithInteractiveContext(originalCode, instructions, filename string, initialWorkspaceContext string, cfg *config.Config) (string, string, error) {
 	modelName := cfg.EditingModel
 	fmt.Printf(prompts.UsingModel(modelName)) // Use prompt
 
-	messages := prompts.BuildCodeMessages(code, instructions, filename, cfg.Interactive)
+	messages := prompts.BuildCodeMessages(originalCode, instructions, filename, cfg.Interactive)
+
+	// Prepend the workspace context as a system message
+	workspaceMessage := prompts.Message{
+		Role:    "system",
+		Content: initialWorkspaceContext,
+	}
+	messages = append([]prompts.Message{workspaceMessage}, messages...) // Prepend the workspace context
 
 	if !cfg.Interactive {
 		_, response, err := GetLLMResponse(modelName, messages, filename, cfg, 6*time.Minute)
