@@ -14,11 +14,6 @@ import (
 	"time"
 )
 
-var (
-	// DefaultTokenLimit is the default token limit for API calls
-	DefaultTokenLimit = 30000
-)
-
 // --- Request/Response Structs for APIs ---
 
 type OpenAIRequest struct {
@@ -228,10 +223,17 @@ func GetLLMResponseStream(modelName string, messages []prompts.Message, filename
 	for _, msg := range messages {
 		totalInputTokens += EstimateTokens(msg.Content)
 	}
+
+	// Get the token limit for the specific model, or fall back to default
+	tokenLimit, ok := cfg.ModelTokenLimits[modelName]
+	if !ok {
+		tokenLimit = cfg.ModelTokenLimits["default"] // Use the global default
+	}
+
 	fmt.Printf(prompts.TokenEstimate(totalInputTokens, modelName)) // Use prompt
-	if totalInputTokens > DefaultTokenLimit && !cfg.SkipPrompt {
+	if totalInputTokens > tokenLimit && !cfg.SkipPrompt {
 		reader := bufio.NewReader(os.Stdin)
-		fmt.Printf(prompts.TokenLimitWarning(totalInputTokens, DefaultTokenLimit)) // Use prompt
+		fmt.Printf(prompts.TokenLimitWarning(totalInputTokens, tokenLimit)) // Use prompt
 		confirm, err := reader.ReadString('\n')
 		if err != nil {
 			fmt.Printf(prompts.APIKeyError(err)) // Use prompt

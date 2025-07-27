@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ledit - AI-Powered Code Editor</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1><i class="fas fa-code"></i> ledit</h1>
+            <p class="tagline">AI-Powered Code Editor & Orchestrator</p>
+            <div class="cta-buttons">
+                <a href="#installation" class="btn primary">Get Started</a>
+                <a href="https://github.com/ledit-dev/ledit" class="btn secondary" target="_blank">GitHub</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section id="features" class="section">
+            <h2>Core Features</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <i class="fas fa-magic"></i>
+                    <h3>Intelligent Code Generation</h3>
+                    <p>Create and modify code using natural language with context-aware suggestions</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-project-diagram"></i>
+                    <h3>Workspace Understanding</h3>
+                    <p>Automatically analyzes your project structure and dependencies</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-robot"></i>
+                    <h3>Multi-LLM Support</h3>
+                    <p>Works with OpenAI, Groq, Gemini, Ollama and more</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-search"></i>
+                    <h3>Search Grounding</h3>
+                    <p>Augment prompts with current web information using #SG</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-comments"></i>
+                    <h3>Interactive Context</h3>
+                    <p>LLM can request more information (files, user input, shell output) to refine its understanding</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-shield-alt"></i>
+                    <h3>Code Security Insights</h3>
+                    <p>Identifies potential security concerns in your codebase during workspace analysis</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-history"></i>
+                    <h3>Change Tracking</h3>
+                    <p>Built-in version history with diff visualization</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fab fa-git-alt"></i>
+                    <h3>Git Integration</h3>
+                    <p>Automatic commits with generated messages</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="installation" class="section">
+            <h2>Installation</h2>
+            <div class="content-box">
+                <h3>Automated Installation</h3>
+                <p>The easiest way to install ledit is by using our platform-specific install scripts:</p>
+
+                <h4>Linux & macOS</h4>
+                <div class="code-block">
+                    <pre><code>curl -fsSL https://raw.githubusercontent.com/ledit-dev/ledit/main/install.sh | bash</code></pre>
+                    <button class="copy-button"><i class="far fa-copy"></i></button>
+                </div>
+                <p>This script will download the latest ledit binary and install it to <code>/usr/local/bin</code>. You may be prompted for your password to use <code>sudo</code>.</p>
+
+                <h4>Windows (PowerShell)</h4>
+                <div class="code-block">
+                    <pre><code>irm https://raw.githubusercontent.com/ledit-dev/ledit/main/install.ps1 | iex</code></pre>
+                    <button class="copy-button"><i class="far fa-copy"></i></button>
+                </div>
+                <p>This script will download the latest ledit binary and install it to your user's local application data directory, then add it to your user's PATH. You may need to restart your terminal or PowerShell session for the changes to take effect.</p>
+
+                <h3>Manual Installation (From Source)</h3>
+                <div class="code-block">
+                    <pre><code>git clone https://github.com/ledit-dev/ledit.git
+cd ledit
+go build -o ledit .
+# Move the 'ledit' executable to a directory in your PATH, e.g., /usr/local/bin or C:\Windows
+</code></pre>
+                    <button class="copy-button"><i class="far fa-copy"></i></button>
+                </div>
+            </div>
+        </section>
+
+        <section id="usage" class="section">
+            <h2>Quick Start</h2>
+            <div class="content-box">
+                <div class="code-block">
+                    <pre><code># Initialize project
+ledit init
+
+# Create new file
+ledit code "Python factorial function" --filename math.py
+
+# Modify existing code
+ledit code "Add error handling" --filename math.py
+
+# Complex feature orchestration
+ledit orchestrate "Implement user authentication"
+
+# Fix a bug or issue
+ledit fix "Fix the null pointer dereference in main.go" --filename main.go
+
+# View change history
+ledit log
+
+# Ignore files or security concerns
+ledit ignore add .env --type file
+ledit ignore add "Insecure deserialization" --type security
+
+# Ask a question about your code
+ledit question "What does the `ProcessCodeGeneration` function do?" --filename pkg/editor/editor.go
+</code></pre>
+                    <button class="copy-button"><i class="far fa-copy"></i></button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <p>ledit - AI-Powered Code Editor | &copy; 2023</p>
+            <div class="footer-links">
+                <a href="https://github.com/ledit-dev/ledit" target="_blank">GitHub</a>
+                <a href="https://github.com/ledit-dev/ledit/issues" target="_blank">Issues</a>
+                <a href="https://github.com/ledit-dev/ledit/blob/main/LICENSE" target="_blank">License</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

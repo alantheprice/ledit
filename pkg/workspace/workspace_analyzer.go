@@ -1,96 +1,103 @@
 package workspace
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"github.com/alantheprice/ledit/pkg/config"
-	"github.com/alantheprice/ledit/pkg/llm"
-	"github.com/alantheprice/ledit/pkg/prompts"
+	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
-	"time"
+
+	"github.com/alantheprice/ledit/pkg/config"
+	"github.com/alantheprice/ledit/pkg/git"
+	"github.com/alantheprice/ledit/pkg/types" // Added import for common types
 )
 
-// generateFileHash creates a SHA256 hash of the file content.
-func generateFileHash(content string) string {
-	hasher := sha256.New()
-	hasher.Write([]byte(content))
-	return hex.EncodeToString(hasher.Sum(nil))
+// GatherAdditionalWorkspaceContext collects git information and file system structure.
+func GatherAdditionalWorkspaceContext(cfg *config.Config) (*types.GitWorkspaceInfo, *types.FileSystemInfo, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get current working directory: %w", err)
+	}
+
+	gitInfo := &types.GitWorkspaceInfo{}
+	gitRoot, err := git.GetGitRootDir()
+	if err == nil {
+		gitInfo.IsGitRepo = true
+		gitInfo.GitRootPath = gitRoot
+		gitInfo.IsGitRoot = (gitRoot == cwd)
+		relPath, relErr := filepath.Rel(gitRoot, cwd)
+		if relErr == nil {
+			gitInfo.CurrentDirInGitRoot = relPath
+		} else {
+			gitInfo.CurrentDirInGitRoot = cwd // Fallback to absolute if relative fails
+		}
+	} else {
+		gitInfo.IsGitRepo = false
+	}
+
+	fileSystemInfo := &types.FileSystemInfo{}
+	var treeBuilder strings.Builder
+	treeBuilder.WriteString(".\n") // Start with current directory
+
+	// Walk the directory tree, limiting depth to 2 for brevity
+	err = filepath.Walk(cwd, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		relPath, err := filepath.Rel(cwd, path)
+		if err != nil {
+			return err
+		}
+
+		// Skip .git and .ledit directories
+		if info.IsDir() && (info.Name() == ".git" || info.Name() == ".ledit") && relPath != "." {
+			return filepath.SkipDir
+		}
+
+		depth := strings.Count(relPath, string(os.PathSeparator))
+		if relPath == "." {
+			depth = 0
+		}
+
+		if depth <= 2 { // Limit to 2 levels deep
+			if relPath != "." {
+				indent := strings.Repeat("  ", depth)
+				if info.IsDir() {
+					treeBuilder.WriteString(fmt.Sprintf("%s├── %s/\n", indent, info.Name()))
+				} else {
+					treeBuilder.WriteString(fmt.Sprintf("%s├── %s\n", indent, info.Name()))
+				}
+			}
+		} else if depth == 3 && info.IsDir() { // Add a "..." for deeper directories
+			indent := strings.Repeat("  ", depth)
+			treeBuilder.WriteString(fmt.Sprintf("%s└── ...\n", indent))
+			return filepath.SkipDir // Skip further traversal into this directory
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("Warning: Error walking file system for context: %v\n", err)
+		fileSystemInfo.BaseFolderStructure = "Could not generate file system structure."
+	} else {
+		fileSystemInfo.BaseFolderStructure = treeBuilder.String()
+	}
+
+	return gitInfo, fileSystemInfo, nil
 }
 
-// getSummary uses an LLM to generate a summary, exports, and references for a given file content.
-func getSummary(content, filename string, cfg *config.Config) (string, string, string, error) {
-	// Check if the file is a text file
-	if !isTextFile(filename) {
-		return "", "", "", fmt.Errorf("file type not supported for analysis")
-	}
-
-	// Tweak the prompt for better results and explicit JSON format
-	prompt := fmt.Sprintf("Analyze the following code from the file '%s'.\n", filename)
-	prompt += "Your task is to provide three pieces of information in JSON format:\n1.  A CONCISE summary of the file's overall purpose and functionality.\n2.  A list of all exported (publicly accessible) functions, types, and variables. For each exported item, include its name, or method signature and a very brief description when needed.\n3.  List of referenced files with their workspace relative path and extension.\nThe output MUST be a JSON object with three keys: 'summary' (string), 'exports' (string), and 'references' (array of strings).\nExample JSON structure:\n{\n  \"summary\": \"This file manages user authentication and session handling.\",\n  \"exports\": \"Login(username, password) - Authenticates a user; Logout() - Ends the current session; User struct - Represents a user profile.\",\n  \"references\": [\"file-path1\", \"file-path2\"]\n}\n\n"
-
-	finalPrompt := fmt.Sprintf("%s```\n%s\n```", prompt, content)
-	messages := []prompts.Message{
-		{
-			Role:    "system",
-			Content: "You are an expert code analyst. Provide your analysis in the requested raw JSON format, without any markdown formatting.",
-		},
-		{
-			Role:    "user",
-			Content: finalPrompt,
-		},
-	}
-
-	// Set 40-second timeout for workspace summary requests
-	_, response, err := llm.GetLLMResponse(cfg.SummaryModel, messages, filename, cfg, 40*time.Second)
+// UpdateWorkspaceFile updates the Git and FileSystem context within the provided WorkspaceFile.
+func UpdateWorkspaceFile(ws *types.WorkspaceFile, cfg *config.Config) (*types.WorkspaceFile, error) {
+	// Gather and update additional workspace context
+	gitInfo, fileSystemInfo, err := GatherAdditionalWorkspaceContext(cfg)
 	if err != nil {
-		return "", "", "", fmt.Errorf("LLM request failed: %w", err)
+		return nil, fmt.Errorf("failed to gather additional workspace context: %w", err)
 	}
+	ws.GitInfo = *gitInfo
+	ws.FileSystem = *fileSystemInfo
 
-	// Log the raw LLM response for troubleshooting
-	fmt.Printf("DEBUG: Raw LLM Response for %s:\n%s\n", filename, response)
+	// File summaries are now handled by the calling layer (e.g., llm.GetLLMCodeResponse)
+	// and are expected to be updated in the ws.Files map before saving.
 
-	// Attempt to extract JSON from markdown code blocks if present
-	if strings.Contains(response, "```json") {
-		re := regexp.MustCompile("(?s)```json\n(.*?)\n```")
-		matches := re.FindStringSubmatch(response)
-		if len(matches) > 1 {
-			response = matches[1]
-		}
-	} else if strings.HasPrefix(response, "```") && strings.HasSuffix(response, "```") {
-		// Handle cases where it's just ``` and then the JSON
-		response = strings.TrimPrefix(response, "```")
-		response = strings.TrimSuffix(response, "```")
-	}
-	response = strings.TrimSpace(response)
-
-	var result struct {
-		Summary    string   `json:"summary"`
-		Exports    string   `json:"exports"`
-		References []string `json:"references"`
-	}
-	err = json.Unmarshal([]byte(response), &result)
-	if err != nil {
-		return "", "", "", fmt.Errorf("failed to unmarshal LLM JSON response: %w. Response: %s", err, response)
-	}
-
-	// Convert references array to a string if needed
-	referencesStr := strings.Join(result.References, ", ")
-
-	return result.Summary, result.Exports, referencesStr, nil
-}
-
-// isTextFile checks if a file has a common text-based extension.
-func isTextFile(filename string) bool {
-	textExtensions := []string{".txt", ".go", ".py", ".js", ".java", ".c", ".cpp", ".h", ".hpp", ".md", ".json", ".yaml", ".yml", ".sh", ".bash", ".sql", ".html", ".css", ".xml", ".csv", ".ts", ".tsx", ".php", ".rb", ".swift", ".kt", ".scala", ".rust", ".rs", ".dart", ".perl", ".pl", ".pm", ".lua", ".vim", ".toml"}
-	ext := filepath.Ext(filename)
-	for _, te := range textExtensions {
-		if ext == te {
-			return true
-		}
-	}
-	return false
+	return ws, nil
 }

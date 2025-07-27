@@ -11,6 +11,7 @@ import (
 	"github.com/alantheprice/ledit/pkg/config"
 	"github.com/alantheprice/ledit/pkg/llm"
 	"github.com/alantheprice/ledit/pkg/prompts"
+	"github.com/alantheprice/ledit/pkg/types"
 )
 
 const fileBatchSize = 50
@@ -20,10 +21,10 @@ type llmFileSelectionResponse struct {
 	SummaryContextFiles []string `json:"summary_context_files"`
 }
 
-// getFilesForContext uses an LLM to determine which files from the workspace
+// GetFilesForContext uses an LLM to determine which files from the workspace
 // are relevant to the user's instructions. It returns two lists: one for files
 // to be included with full content, and one for files to be included as summaries.
-func getFilesForContext(instructions string, workspace WorkspaceFile, cfg *config.Config) ([]string, []string, error) {
+func GetFilesForContext(instructions string, workspace *types.WorkspaceFile, cfg *config.Config) ([]string, []string, error) {
 	var allFiles []string
 	for file := range workspace.Files {
 		allFiles = append(allFiles, file)

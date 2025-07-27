@@ -90,9 +90,15 @@ func interactiveQuestionLoop(cfg *config.Config, initialQuestion string) {
 			totalInputTokens += llm.EstimateTokens(msg.Content)
 		}
 
-		if totalInputTokens > llm.DefaultTokenLimit && !cfg.SkipPrompt {
+		// Get the token limit for the specific model, or fall back to default
+		currentModelTokenLimit, ok := cfg.ModelTokenLimits[cfg.EditingModel]
+		if !ok {
+			currentModelTokenLimit = cfg.ModelTokenLimits["default"] // Use the global default
+		}
+
+		if totalInputTokens > currentModelTokenLimit && !cfg.SkipPrompt {
 			fmt.Printf("\nThis request will take approximately %d tokens with model %s.\n\n", totalInputTokens, cfg.EditingModel)
-			fmt.Printf("NOTE: This request at %d tokens is over the default token limit of %d, do you want to continue? (y/n): ", totalInputTokens, llm.DefaultTokenLimit)
+			fmt.Printf("NOTE: This request at %d tokens is over the default token limit of %d, do you want to continue? (y/n): ", totalInputTokens, currentModelTokenLimit)
 
 			confirm, err := reader.ReadString('\n') // Use the same buffered reader
 			if err != nil {

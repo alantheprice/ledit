@@ -2,28 +2,67 @@ package workspace
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"path/filepath"
+
+	"github.com/alantheprice/ledit/pkg/types" // Updated import
 )
 
-// saveWorkspaceFile writes the WorkspaceFile struct to a JSON file.
-func saveWorkspaceFile(workspace WorkspaceFile, filePath string) error {
-	data, err := json.MarshalIndent(workspace, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filePath, data, 0644)
+const (
+	leditDir      = ".ledit"
+	workspaceFile = "workspace.json"
+)
+
+// GetWorkspaceFilePath returns the full path to the workspace.json file.
+func GetWorkspaceFilePath(dir string) string {
+	return filepath.Join(dir, leditDir, workspaceFile)
 }
 
-// loadWorkspaceFile reads a WorkspaceFile struct from a JSON file.
-func loadWorkspaceFile(filePath string) (WorkspaceFile, error) {
-	var workspace WorkspaceFile
+// LoadWorkspace loads the WorkspaceFile from the specified directory.
+func LoadWorkspace(dir string) (*types.WorkspaceFile, error) {
+	filePath := GetWorkspaceFilePath(dir)
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return workspace, err
+		if os.IsNotExist(err) {
+			// Return an empty workspace with initialized maps if file doesn't exist
+			return &types.WorkspaceFile{
+				Files:      make(map[string]types.FileInfo),
+				GitInfo:    types.GitWorkspaceInfo{},
+				FileSystem: types.FileSystemInfo{},
+			}, nil
+		}
+		return nil, fmt.Errorf("failed to read workspace file %s: %w", filePath, err)
 	}
-	err = json.Unmarshal(data, &workspace)
+
+	var ws types.WorkspaceFile // Updated type
+	if err := json.Unmarshal(data, &ws); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal workspace file %s: %w", filePath, err)
+	}
+
+	// Ensure maps are initialized even if unmarshaling from an empty file or old format
+	if ws.Files == nil {
+		ws.Files = make(map[string]types.FileInfo) // Updated type
+	}
+
+	return &ws, nil
+}
+
+// SaveWorkspace saves the WorkspaceFile to the specified directory.
+func SaveWorkspace(dir string, ws *types.WorkspaceFile) error { // Updated type
+	workspaceDir := filepath.Join(dir, leditDir)
+	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
+		return fmt.Errorf("failed to create .ledit directory: %w", err)
+	}
+
+	filePath := GetWorkspaceFilePath(dir)
+	data, err := json.MarshalIndent(ws, "", "    ")
 	if err != nil {
-		return workspace, err
+		return fmt.Errorf("failed to marshal workspace data: %w", err)
 	}
-	return workspace, nil
+
+	if err := os.WriteFile(filePath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write workspace file %s: %w", filePath, err)
+	}
+	return nil
 }

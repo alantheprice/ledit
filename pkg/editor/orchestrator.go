@@ -4,14 +4,16 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/alantheprice/ledit/pkg/config"
-	"github.com/alantheprice/ledit/pkg/llm"
-	"github.com/alantheprice/ledit/pkg/prompts" // Import the new prompts package
-	"github.com/alantheprice/ledit/pkg/utils"
-	"github.com/alantheprice/ledit/pkg/workspace"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/alantheprice/ledit/pkg/config"
+	"github.com/alantheprice/ledit/pkg/llm"
+	"github.com/alantheprice/ledit/pkg/prompts" // Import the new prompts package
+	"github.com/alantheprice/ledit/pkg/types"   // Added import for common types
+	"github.com/alantheprice/ledit/pkg/utils"
+	"github.com/alantheprice/ledit/pkg/workspace"
 )
 
 // OrchestrateFeature is the main entry point for the orchestrate command.
@@ -69,7 +71,7 @@ func OrchestrateFeature(prompt string, cfg *config.Config) error {
 	return rp.Process(newPlan)
 }
 
-func hasPendingRequirements(plan *OrchestrationPlan) bool {
+func hasPendingRequirements(plan *types.OrchestrationPlan) bool {
 	for _, req := range plan.Requirements {
 		if req.Status == "pending" || req.Status == "failed" {
 			return true
@@ -78,7 +80,7 @@ func hasPendingRequirements(plan *OrchestrationPlan) bool {
 	return false
 }
 
-func generateRequirements(prompt string, cfg *config.Config) (*OrchestrationPlan, error) {
+func generateRequirements(prompt string, cfg *config.Config) (*types.OrchestrationPlan, error) {
 	// Process the initial prompt for search grounding or workspace context
 	processedPrompt, err := processInstructions(prompt, cfg)
 	if err != nil {
@@ -96,12 +98,12 @@ func generateRequirements(prompt string, cfg *config.Config) (*OrchestrationPlan
 		return nil, fmt.Errorf("LLM returned an empty plan")
 	}
 
-	var plan OrchestrationPlan
+	var plan types.OrchestrationPlan // Use types.OrchestrationPlan
 	if err := json.Unmarshal([]byte(response), &plan); err != nil {
 		return nil, fmt.Errorf("failed to parse requirements JSON from LLM response: %w\nResponse was: %s", err, response)
 	}
 
-	if err := saveOrchestrationPlan(&plan); err != nil {
+	if err := saveOrchestrationPlan(&plan); err != nil { // Pass address of plan
 		return nil, fmt.Errorf("failed to save orchestration plan: %w", err)
 	}
 
