@@ -9,6 +9,19 @@ type JinaSearchResult struct {
 	Description string `json:"description"` // This will be the snippet/description from search, not full content
 }
 
+// GithubSearchResult represents a single search result from GitHub API.
+type GithubSearchResult struct {
+	Name       string `json:"name"`
+	Path       string `json:"path"`
+	HTMLURL    string `json:"html_url"`
+	Repository struct {
+		FullName string `json:"full_name"`
+	} `json:"repository"`
+	TextMatches []struct {
+		Fragment string `json:"fragment"`
+	} `json:"text_matches"`
+}
+
 // ReferenceCacheEntry stores cached search results and fetched content.
 type ReferenceCacheEntry struct {
 	Query          string             `json:"query"`
