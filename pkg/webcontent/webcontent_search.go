@@ -15,7 +15,7 @@ import (
 	"github.com/alantheprice/ledit/pkg/utils"
 )
 
-const jinaSearchURL = "https://s.jina.ai/search"
+const githubSearchURL = "https://api.github.com/search/code"
 
 func FetchContextFromSearch(query string, cfg *config.Config) (string, error) {
 	logger := utils.GetLogger(cfg.SkipPrompt)
@@ -27,11 +27,11 @@ func FetchContextFromSearch(query string, cfg *config.Config) (string, error) {
 		return "", nil
 	}
 
-	// Fetch search results and content using Jina AI Search API
-	results, err := fetchJinaSearchResults(query, cfg)
+	// Fetch search results and content using GitHub Search API
+	results, err := fetchGithubSearchResults(query, cfg)
 	if err != nil {
-		logger.Logf("Error fetching Jina search results: %v", err)
-		return "", fmt.Errorf("failed to fetch Jina search results: %w", err)
+		logger.Logf("Error fetching GitHub search results: %v", err)
+		return "", fmt.Errorf("failed to fetch GitHub search results: %w", err)
 	}
 
 	if len(results) == 0 {
@@ -53,7 +53,7 @@ func getSearchResults(query string, cfg *config.Config) ([]JinaSearchResult, err
 	logger := utils.GetLogger(cfg.SkipPrompt)
 	startTime := time.Now()
 	defer func() {
-		logger.Logf("Jina search results fetch completed in %v", time.Since(startTime))
+		logger.Logf("GitHub search results fetch completed in %v", time.Since(startTime))
 	}()
 
 	logger.LogProcessStep("Checking for cached search results")
@@ -64,60 +64,80 @@ func getSearchResults(query string, cfg *config.Config) ([]JinaSearchResult, err
 		logger.Logf("Cache check result: %v", err)
 	}
 
-	// Get Jina API Key. This will prompt the user if the key is not found.
-	jinaAPIKey, err := llm.GetAPIKey("JinaAI")
+	// Get GitHub API Key.
+	githubAPIKey, err := llm.GetAPIKey("github")
 	if err != nil {
-		logger.Logf("Could not get Jina API key: %v. Proceeding without it, but may be rate limited.", err)
+		logger.Logf("Could not get GitHub API key: %v. Proceeding without it, but may be rate limited.", err)
 	} else {
-		logger.Log("Using Jina API key for search")
+		logger.Log("Using GitHub API key for search")
 	}
 
-	logger.LogProcessStep(fmt.Sprintf("Performing Jina AI search for query: %s", query))
-	req, err := http.NewRequest("GET", jinaSearchURL, nil)
+	logger.LogProcessStep(fmt.Sprintf("Performing GitHub Code search for query: %s", query))
+	req, err := http.NewRequest("GET", githubSearchURL, nil)
 	if err != nil {
-		logger.Logf("Failed to create Jina request: %v", err)
-		return nil, fmt.Errorf("failed to create jina request: %w", err)
+		logger.Logf("Failed to create GitHub request: %v", err)
+		return nil, fmt.Errorf("failed to create github request: %w", err)
 	}
-	req.Header.Set("Accept", "application/json")
-	if jinaAPIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+jinaAPIKey)
+	req.Header.Set("Accept", "application/vnd.github.text-match+json")
+	if githubAPIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+githubAPIKey)
 	}
 	q := req.URL.Query()
 	q.Add("q", query)
 	req.URL.RawQuery = q.Encode()
 
 	// Increase the timeout for search grounding
-	client := &http.Client{Timeout: 120 * time.Second} // Increased from 10 seconds to 120 seconds
-	logger.Logf("Making HTTP request to Jina API: %s", req.URL.String())
+	client := &http.Client{Timeout: 120 * time.Second}
+	logger.Logf("Making HTTP request to GitHub API: %s", req.URL.String())
 	resp, err := client.Do(req)
 	if err != nil {
-		logger.Logf("Jina search request failed: %v", err)
-		return nil, fmt.Errorf("failed to perform jina search: %w", err)
+		logger.Logf("GitHub search request failed: %v", err)
+		return nil, fmt.Errorf("failed to perform github search: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		logger.Logf("Failed to read Jina response body: %v", err)
-		return nil, fmt.Errorf("failed to read jina response body: %w", err)
+		logger.Logf("Failed to read GitHub response body: %v", err)
+		return nil, fmt.Errorf("failed to read github response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		logger.Logf("GitHub search API returned status %d. Body: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("github search failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var searchResponse struct {
-		Data []JinaSearchResult `json:"data"`
+		Items []GithubSearchResult `json:"items"`
 	}
 	if err := json.Unmarshal(body, &searchResponse); err != nil {
-		logger.Logf("Failed to unmarshal Jina response: %v", err)
-		return nil, fmt.Errorf("failed to unmarshal jina response: %w", err)
+		logger.Logf("Failed to unmarshal GitHub response: %v", err)
+		return nil, fmt.Errorf("failed to unmarshal github response: %w", err)
 	}
 
-	logger.Logf("Received %d search results from Jina", len(searchResponse.Data))
-	return searchResponse.Data, nil
+	logger.Logf("Received %d search results from GitHub", len(searchResponse.Items))
+
+	var jinaResults []JinaSearchResult
+	for _, item := range searchResponse.Items {
+		var description strings.Builder
+		for _, match := range item.TextMatches {
+			description.WriteString(match.Fragment)
+			description.WriteString("\n")
+		}
+		jinaResults = append(jinaResults, JinaSearchResult{
+			Title:       fmt.Sprintf("%s: %s", item.Repository.FullName, item.Path),
+			URL:         item.HTMLURL,
+			Description: description.String(),
+		})
+	}
+
+	return jinaResults, nil
 }
 
-// fetchJinaSearchResults fetches search results using Jina AI Search API,
+// fetchGithubSearchResults fetches search results using GitHub Search API,
 // selects relevant URLs using LLM, and fetches full content of selected URLs.
 // uses embeddings to find the most relevant parts of the text for a given query.
-func fetchJinaSearchResults(query string, cfg *config.Config) (map[string]string, error) {
+func fetchGithubSearchResults(query string, cfg *config.Config) (map[string]string, error) {
 	fetcher := NewWebContentFetcher()
 	logger := utils.GetLogger(cfg.SkipPrompt)
 	searchResponse, err := getSearchResults(query, cfg)
