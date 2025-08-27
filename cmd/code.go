@@ -1,15 +1,17 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/alantheprice/ledit/pkg/config"
-	"github.com/alantheprice/ledit/pkg/editor"
+	"github.com/alantheprice/ledit/pkg/core"
 	"github.com/alantheprice/ledit/pkg/prompts"
 	"github.com/alantheprice/ledit/pkg/providers"
 	tuiPkg "github.com/alantheprice/ledit/pkg/tui"
+	"github.com/alantheprice/ledit/pkg/types"
 	ui "github.com/alantheprice/ledit/pkg/ui"
 	"github.com/alantheprice/ledit/pkg/utils"
 )
@@ -95,8 +97,8 @@ func executeCodeCommand(cfg *CommandConfig, args []string) error {
 	ui.PrintContext(prompts.ProcessingCodeGeneration()+"\n", false)
 	startTime := time.Now()
 
-	// Execute code generation with enhanced UI integration
-	result, err := executeCodeGenerationWithUI(filename, instructions, cfg.Config, imagePath)
+	// Execute code generation
+	result, err := executeCodeGeneration(filename, instructions, cfg.Config, imagePath)
 	if err != nil {
 		ui.PublishStatus("Code generation failed")
 		return fmt.Errorf("code generation failed: %w", err)
@@ -150,76 +152,6 @@ func startInteractiveCodeTUI() error {
 	return nil
 }
 
-// executeCodeGenerationWithUI wraps code generation with UI progress updates
-func executeCodeGenerationWithUI(filename, instructions string, cfg *config.Config, imagePath string) (*CodeGenerationResult, error) {
-	startTime := time.Now()
-	
-	// Publish progress updates
-	ui.PublishProgress(0, 1, []ui.ProgressRow{
-		{Name: "Code Generation", Status: "processing", Step: "Analyzing request", Tokens: 0, Cost: 0},
-	})
-
-	// Execute the actual code generation
-	diff, err := editor.ProcessCodeGeneration(filename, instructions, cfg, imagePath)
-	if err != nil {
-		// Update progress with error
-		ui.PublishProgress(0, 1, []ui.ProgressRow{
-			{Name: "Code Generation", Status: "failed", Step: "Error: " + err.Error(), Tokens: 0, Cost: 0},
-		})
-		return nil, err
-	}
-
-	duration := time.Since(startTime)
-
-	// Create result with token usage from config
-	result := &CodeGenerationResult{
-		Files:    []string{filename}, // Single file for now
-		Duration: duration,
-	}
-
-	// Extract generated files from diff if possible
-	if diff != "" {
-		// For now, just indicate that we have generated content
-		result.Files = []string{"Generated code"}
-	}
-
-	if cfg.LastTokenUsage != nil {
-		result.TokenUsage = &TokenUsageInfo{
-			PromptTokens:     cfg.LastTokenUsage.PromptTokens,
-			CompletionTokens: cfg.LastTokenUsage.CompletionTokens,
-			TotalTokens:      cfg.LastTokenUsage.TotalTokens,
-			Model:           cfg.EditingModel,
-		}
-
-		// Calculate cost
-		if provider, err := providers.GetProvider(cfg.EditingModel); err == nil {
-			cost := provider.CalculateCost(providers.TokenUsage{
-				PromptTokens:     cfg.LastTokenUsage.PromptTokens,
-				CompletionTokens: cfg.LastTokenUsage.CompletionTokens,
-				TotalTokens:      cfg.LastTokenUsage.TotalTokens,
-			})
-
-			// Update progress with final results
-			ui.PublishProgress(1, 1, []ui.ProgressRow{
-				{Name: "Code Generation", Status: "completed", Step: "Generated code changes", 
-				 Tokens: result.TokenUsage.TotalTokens, Cost: cost},
-			})
-
-			// Update progress with totals
-			ui.PublishProgressWithTokens(1, 1, result.TokenUsage.TotalTokens, cost, cfg.EditingModel, []ui.ProgressRow{
-				{Name: "Code Generation", Status: "completed", Step: "Generated code changes", 
-				 Tokens: result.TokenUsage.TotalTokens, Cost: cost},
-			})
-		}
-	} else {
-		// Update progress without token info
-		ui.PublishProgress(1, 1, []ui.ProgressRow{
-			{Name: "Code Generation", Status: "completed", Step: "Generated code changes", Tokens: 0, Cost: 0},
-		})
-	}
-
-	return result, nil
-}
 
 // displayTokenUsage displays token usage information
 func displayTokenUsage(cfg *CommandConfig, tokenUsage *TokenUsageInfo) error {
@@ -292,4 +224,57 @@ func getImageFlag(args []string) string {
 		}
 	}
 	return ""
+}
+
+// executeCodeGeneration uses the modular architecture for code generation
+func executeCodeGeneration(filename, instructions string, cfg *config.Config, imagePath string) (*CodeGenerationResult, error) {
+	startTime := time.Now()
+	
+	// Publish progress updates
+	ui.PublishProgress(0, 1, []ui.ProgressRow{
+		{Name: "Code Generation", Status: "processing", Step: "Analyzing request", Tokens: 0, Cost: 0},
+	})
+
+	// Initialize core service
+	coreService := core.NewCoreService(cfg)
+	
+	// Create context
+	ctx := context.Background()
+	
+	// Execute code generation using the modular architecture
+	result, err := coreService.GenerateCode(ctx, instructions, filename)
+	if err != nil {
+		// Update progress with error
+		ui.PublishProgress(0, 1, []ui.ProgressRow{
+			{Name: "Code Generation", Status: "failed", Step: "Error: " + err.Error(), Tokens: 0, Cost: 0},
+		})
+		return nil, err
+	}
+
+	duration := time.Since(startTime)
+	
+	// Update progress with success
+	ui.PublishProgress(1, 1, []ui.ProgressRow{
+		{Name: "Code Generation", Status: "completed", Step: "Generation complete", Tokens: 0, Cost: 0},
+	})
+
+	// Convert to the expected result format
+	codeResult := &CodeGenerationResult{
+		Files:    result.Files,
+		Duration: duration,
+	}
+
+	// Add token usage if available
+	if result.TokenUsage != nil {
+		// Type assert the token usage interface
+		if tokenUsage, ok := result.TokenUsage.(*types.TokenUsage); ok {
+			codeResult.TokenUsage = &TokenUsageInfo{
+				PromptTokens:     tokenUsage.PromptTokens,
+				CompletionTokens: tokenUsage.CompletionTokens,
+				TotalTokens:      tokenUsage.TotalTokens,
+			}
+		}
+	}
+
+	return codeResult, nil
 }

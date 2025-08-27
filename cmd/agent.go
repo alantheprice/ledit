@@ -20,7 +20,6 @@ var (
 	agentModel       string // Declare agentModel variable
 	agentDryRun      bool
 	agentDirectApply bool
-	agentSimplified  bool
 )
 
 func init() {
@@ -29,14 +28,13 @@ func init() {
 	agentCmd.Flags().StringVarP(&agentModel, "model", "m", "", "Model name to use with the LLM")
 	agentCmd.Flags().BoolVar(&agentDryRun, "dry-run", false, "Run tools in simulation mode (no writes/shell side-effects)")
 	agentCmd.Flags().BoolVar(&agentDirectApply, "direct-apply", false, "Let the orchestration model directly apply changes via tools (experimental)")
-	agentCmd.Flags().BoolVar(&agentSimplified, "simplified", true, "Use simplified agent workflow with todos and direct execution (default: true)")
 }
 
 // agentCmd represents the agent command
 var agentCmd = &cobra.Command{
 	Use:   "agent [intent]",
 	Short: "AI agent mode - interactive or direct execution of development tasks",
-	Long: `Simplified Agent mode with streamlined workflow for code updates, questions, and commands.
+	Long: `Agent mode with streamlined workflow for code updates, questions, and commands.
 
 The agent can run in two modes:
 
@@ -91,8 +89,8 @@ Examples:
 			go func() { _ = tuiPkg.Run() }()
 		}
 
-		// Default to simplified agent
-		err := agent.RunSimplifiedAgent(userIntent, agentSkipPrompt, agentModel)
+		// Use modular agent as default
+		err := agent.RunModularAgent(userIntent, agentSkipPrompt, agentModel)
 
 		// If there's an error, use graceful exit with token usage information
 		if err != nil {
