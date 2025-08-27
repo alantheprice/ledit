@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/alantheprice/ledit/pkg/agent"
+	"github.com/alantheprice/ledit/pkg/config"
+	"github.com/alantheprice/ledit/pkg/editor"
+	"github.com/alantheprice/ledit/pkg/providers"
 	"github.com/alantheprice/ledit/pkg/ui"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -43,6 +46,7 @@ type model struct {
 	promptVP viewport.Model
 	// interactive mode
 	interactiveMode bool
+	codeMode        bool   // true for code generation mode, false for agent mode
 	textInput       textinput.Model
 	focusedInput    bool
 	commandHistory  []string
@@ -268,9 +272,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 					}
 
-					// Regular agent command execution
-					go executeAgentRequest(input)
-					ui.Logf("🎯 Executing: %s", input)
+					// Execute appropriate command based on mode
+					if m.codeMode {
+						go executeCodeRequest(input)
+						ui.Logf("💻 Generating code: %s", input)
+					} else {
+						go executeAgentRequest(input)
+						ui.Logf("🎯 Executing: %s", input)
+					}
 
 					// Add to command history
 					m.commandHistory = append(m.commandHistory, input)
@@ -736,6 +745,21 @@ func RunInteractiveAgent() error {
 	return err
 }
 
+// RunInteractiveCode starts the TUI in interactive code generation mode
+func RunInteractiveCode() error {
+	m := initialInteractiveModel()
+	// Customize for code generation mode
+	m.codeMode = true
+	m.textInput.SetValue("")
+	m.textInput.Placeholder = "Enter code generation request or /help for commands..."
+	
+	p := tea.NewProgram(m, tea.WithContext(context.Background()), tea.WithAltScreen())
+	_, err := p.Run()
+	// On exit, restore default sink to stdout so subsequent output isn't lost
+	ui.UseStdoutSink()
+	return err
+}
+
 // handleSlashCommand processes slash commands and returns (handled, newModel, cmd)
 func (m model) handleSlashCommand(input string) (bool, *model, tea.Cmd) {
 	parts := strings.Fields(input)
@@ -976,5 +1000,77 @@ func executeAgentRequest(request string) {
 	} else {
 		ui.Logf("✅ Agent request completed successfully")
 		ui.PublishStatus("Agent execution completed")
+	}
+}
+
+// executeCodeRequest executes a code generation request asynchronously
+func executeCodeRequest(request string) {
+	ui.Logf("🚀 Starting code generation: %s", request)
+	ui.PublishStatus("Generating code...")
+
+	// Load config for code generation
+	cfg, err := config.LoadOrInitConfig(true)
+	if err != nil {
+		ui.Logf("❌ Failed to load config: %v", err)
+		ui.PublishStatus("Code generation failed - config error")
+		return
+	}
+
+	// Set environment variables for code generation
+	os.Setenv("LEDIT_SKIP_PROMPT", "1")
+
+	// Publish progress updates
+	ui.PublishProgress(0, 1, []ui.ProgressRow{
+		{Name: "Code Generation", Status: "processing", Step: "Analyzing request", Tokens: 0, Cost: 0},
+	})
+
+	// Execute code generation
+	ui.Logf("⚙️  Analyzing code generation request...")
+	diff, err := editor.ProcessCodeGeneration("", request, cfg, "")
+
+	if err != nil {
+		ui.Logf("❌ Code generation failed: %v", err)
+		ui.PublishStatus("Code generation failed")
+		// Update progress with error
+		ui.PublishProgress(0, 1, []ui.ProgressRow{
+			{Name: "Code Generation", Status: "failed", Step: "Error: " + err.Error(), Tokens: 0, Cost: 0},
+		})
+		return
+	}
+
+	// Display results
+	if diff != "" {
+		ui.Logf("✅ Code generation completed successfully")
+		ui.Logf("📝 Generated code changes")
+	} else {
+		ui.Logf("✅ Code generation completed successfully")
+	}
+
+	ui.PublishStatus("Code generation completed")
+
+	// Update progress with final results and token usage
+	if cfg.LastTokenUsage != nil {
+		// Calculate cost if possible
+		cost := 0.0
+		if provider, err := providers.GetProvider(cfg.EditingModel); err == nil {
+			cost = provider.CalculateCost(providers.TokenUsage{
+				PromptTokens:     cfg.LastTokenUsage.PromptTokens,
+				CompletionTokens: cfg.LastTokenUsage.CompletionTokens,
+				TotalTokens:      cfg.LastTokenUsage.TotalTokens,
+			})
+		}
+
+		// Update progress with final results
+		ui.PublishProgressWithTokens(1, 1, cfg.LastTokenUsage.TotalTokens, cost, cfg.EditingModel, []ui.ProgressRow{
+			{Name: "Code Generation", Status: "completed", Step: "Generated code changes", 
+			 Tokens: cfg.LastTokenUsage.TotalTokens, Cost: cost},
+		})
+
+		ui.Logf("📊 Token usage: %d total tokens (cost: $%.4f)", cfg.LastTokenUsage.TotalTokens, cost)
+	} else {
+		// Update progress without token info
+		ui.PublishProgress(1, 1, []ui.ProgressRow{
+			{Name: "Code Generation", Status: "completed", Step: "Generated code changes", Tokens: 0, Cost: 0},
+		})
 	}
 }

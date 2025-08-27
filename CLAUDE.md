@@ -19,9 +19,11 @@ go install                      # Install to GOPATH/bin
 ./test_e2e.sh                  # Run end-to-end tests via Python test runner
 ./test_e2e.sh --single         # Run single test mode (interactive selection)
 python3 test_runner.py         # Direct test runner execution with parallel support
+./run_adhoc_tests.sh           # Run basic functionality tests without LLM calls
 go test ./...                  # Run unit tests
 go test ./... -v               # Run unit tests with verbose output
 go test -race ./...            # Run unit tests with race detection
+./scripts/run-tests.sh         # Comprehensive test runner script
 ```
 
 ### Development Scripts
@@ -31,6 +33,11 @@ go test -race ./...            # Run unit tests with race detection
 ./e2e_test_scripts/test_agent_v2_full_edit.sh
 ./e2e_test_scripts/test_multi_file_edit.sh
 ./e2e_test_scripts/test_orchestration.sh
+
+# Prompt optimization and testing
+./prompt_optimization/quick_test.sh                    # Quick prompt validation
+./prompt_optimization/run_optimization.sh             # Full optimization run
+go run prompt_optimization/framework/prompt_optimizer  # Core optimization tool
 ```
 
 ## Architecture Overview
@@ -81,6 +88,15 @@ The CLI supports several modes of operation:
 - **`ledit process`**: Multi-step orchestration for complex features
 - **`ledit question`**: Interactive Q&A about the workspace
 - **`ledit fix`**: Error-driven code fixing with validation loops
+- **`ledit commit`**: Generate conventional commit messages with optional auto-commit
+- **`ledit log`**: View change history and rollback operations
+- **`ledit exec`**: Execute shell commands or generate them from intent
+- **`ledit explain`**: Get explanations for code snippets, concepts, or errors
+- **`ledit config`**: Manage configuration settings via CLI
+- **`ledit ignore`**: Add patterns to workspace ignore list
+- **`ledit init`**: Initialize project-specific configuration
+- **`ledit pricing`**: View cost tracking and pricing information
+- **`ledit insights`**: Generate project insights and analysis
 
 ### Multi-Agent Architecture
 
@@ -152,6 +168,30 @@ The workspace context system provides intelligent file selection:
 **Smart Context Selection**:
 The system analyzes all workspace files and intelligently determines which files to include as full content vs summary for optimal LLM context usage.
 
+## Prompt Optimization Framework
+
+The codebase includes a comprehensive prompt optimization system at `prompt_optimization/`:
+
+**Key Features**:
+- **Automated Testing**: Test prompts against defined validation criteria
+- **Iterative Optimization**: Systematic prompt improvement with performance tracking  
+- **A/B Testing**: Compare multiple prompt variants for effectiveness
+- **Cost Tracking**: Monitor performance and cost metrics across optimizations
+- **Model Mapping**: Support for testing across different LLM providers
+
+**Usage**:
+```bash
+# Quick prompt validation
+./prompt_optimization/quick_test.sh
+
+# Run full optimization cycle  
+./prompt_optimization/run_optimization.sh
+
+# Advanced optimization with specific models
+./prompt_optimization/framework/prompt_optimizer_advanced --model-mapping \
+  --models "deepinfra:Qwen/Qwen2.5-Coder-32B-Instruct" --type text_replacement --iterations 2
+```
+
 ## Development Notes
 
 - **Modular Architecture**: Currently undergoing modular architecture refactor on `feat/modular-architecture-refactor` branch
@@ -161,3 +201,4 @@ The system analyzes all workspace files and intelligently determines which files
 - **Self-Correction**: Orchestration includes retry logic with error analysis and web search
 - **TDD Integration**: Test-driven development workflows in orchestration mode
 - **Testing**: Python-based E2E test runner with parallel execution and timeout handling
+- **Prompt Engineering**: Systematic prompt optimization framework for continuous improvement

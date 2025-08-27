@@ -372,6 +372,18 @@ func GetWorkspaceTree() (string, error) {
 }
 
 // getLanguageFromFilename infers the programming language from the file extension.
+// GetWorkspaceContext provides workspace context for instructions
+func GetWorkspaceContext(instructions string, cfg *config.Config) string {
+	// Try to get workspace context from existing workspace
+	workspace, err := validateAndUpdateWorkspace("./", cfg)
+	if err != nil {
+		return ""
+	}
+
+	// Build syntactic overview
+	return buildSyntacticOverview(workspace)
+}
+
 func getLanguageFromFilename(filename string) string {
 	ext := strings.ToLower(filepath.Ext(filename))
 	switch ext {
