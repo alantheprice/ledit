@@ -25,25 +25,30 @@ func createCodeCommand() *BaseCommand {
 
 The code command can run in two modes:
 
-1. **Interactive Mode** (with --ui flag):
-   - Run "ledit code --ui" to start interactive TUI mode
+1. **Interactive Mode** (default when no instructions provided):
+   - Run "ledit code" to start interactive TUI mode
    - Enter code generation requests in real-time
    - Watch progress and see live updates
    - Perfect for iterative code development
 
-2. **Direct Mode** (with command line arguments):
+2. **Direct Mode** (when instructions provided):
    - Run "ledit code \"your instructions\"" for one-shot execution
+   - Ideal for scripting, automation, and command-line tools
+   - No UI interface, direct output to console
 
 When using the --image flag, ensure your model supports vision input. Vision-capable models include:
   - openai:gpt-4o, openai:gpt-4-turbo, openai:gpt-4-vision-preview
   - deepinfra:google/gemini-2.5-flash, deepinfra:google/gemini-2.5-pro
 
 Examples:
+  # Interactive mode (default)
+  ledit code
+  
+  # Direct mode (for automation/scripting)
   ledit code "Add error handling to the main function"
   ledit code --filename main.go "Refactor this function to be more efficient"
   ledit code --model gpt-4 --skip-prompt "Generate a REST API endpoint"
-  ledit code --image screenshot.png "Create a UI component based on this design"
-  ledit code --ui  # Start interactive mode with TUI`,
+  ledit code --image screenshot.png "Create a UI component based on this design"`,
 	)
 
 	// Add custom flags specific to code command
@@ -58,25 +63,16 @@ Examples:
 }
 
 func executeCodeCommand(cfg *CommandConfig, args []string) error {
-	// Check for UI mode flag (would need to be accessed from BaseCommand in real implementation)
-	isUIMode := ui.FromEnv() || checkUIFlag(args)
+	// Extract instructions from arguments (filter out --ui flag if present)
+	instructions := extractInstructions(args)
 	
-	// If UI mode is requested, start interactive TUI
-	if isUIMode {
+	// If no instructions provided, default to interactive TUI mode
+	if instructions == "" {
 		return startInteractiveCodeTUI()
 	}
 
-	// Extract instructions from arguments (filter out --ui flag if present)
-	instructions := extractInstructions(args)
-
-	// Log the original user prompt
+	// Log the original user prompt for direct mode
 	utils.LogUserPrompt(instructions)
-
-	// Validate input for direct mode
-	if instructions == "" {
-		ui.Out().Print(prompts.InstructionsRequired() + "\n")
-		return fmt.Errorf("instructions are required for direct mode. Use --ui for interactive mode")
-	}
 
 	// Get custom flag values
 	filename := getFilenameFlag(args)
@@ -263,15 +259,6 @@ func displayTokenUsage(cfg *CommandConfig, tokenUsage *TokenUsageInfo) error {
 }
 
 // Helper functions for flag parsing (these would be properly implemented via BaseCommand)
-
-func checkUIFlag(args []string) bool {
-	for _, arg := range args {
-		if arg == "--ui" {
-			return true
-		}
-	}
-	return false
-}
 
 func extractInstructions(args []string) string {
 	var instructions []string

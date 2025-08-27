@@ -40,15 +40,16 @@ var agentCmd = &cobra.Command{
 
 The agent can run in two modes:
 
-1. **Interactive Mode** (with --ui flag):
-   - Run "ledit agent --ui" to start interactive TUI mode
+1. **Interactive Mode** (default when no arguments provided):
+   - Run "ledit agent" to start interactive TUI mode
    - Type requests in the bottom input box and press Enter to execute
    - Watch real-time progress and logs
    - Perfect for iterative development workflows
 
-2. **Direct Mode** (with command line arguments):
+2. **Direct Mode** (when arguments provided):
    - Run "ledit agent \"your request\"" for one-shot execution
-   - Ideal for scripting and automation
+   - Ideal for scripting, automation, and command-line tools
+   - No UI interface, direct output to console
 
 The agent uses a simplified approach:
 • For code updates: Creates todos, executes them via the code command with auto-review, validates builds
@@ -63,24 +64,19 @@ Workflow:
 5. Questions and commands are handled directly without todos
 
 Examples:
-  # Interactive mode
-  ledit agent --ui
+  # Interactive mode (default)
+  ledit agent
   
-  # Direct mode
+  # Direct mode (for automation/scripting)
   ledit agent "Add better error handling to the main function"
   ledit agent "How does the authentication system work?"
   ledit agent "run build command"
   ledit agent "Fix the bug where users can't login"`,
 	Args: cobra.MaximumNArgs(1), // Allow 0 or 1 args for interactive mode
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// If no arguments provided, check if UI is available for interactive mode
+		// If no arguments provided, default to interactive TUI mode
 		if len(args) == 0 {
-			if uiPkg.IsUIActive() {
-				// Start interactive TUI mode
-				return startInteractiveTUI()
-			} else {
-				return fmt.Errorf("no intent provided. Use: ledit agent \"<your request>\" or enable UI mode with --ui flag")
-			}
+			return startInteractiveTUI()
 		}
 		userIntent := strings.Join(args, " ")
 		// Mark this invocation as coming from agent for downstream logic (e.g., automated review policy)
