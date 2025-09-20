@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	api "github.com/alantheprice/ledit/pkg/agent_api"
 	"github.com/alantheprice/ledit/pkg/configuration"
 	"github.com/spf13/cobra"
 )
@@ -66,6 +67,13 @@ func initializeSystem() {
 		// Don't fail on API key initialization errors - will be created on demand
 		if os.Getenv("LEDIT_DEBUG") != "" {
 			println("API key initialization warning:", err.Error())
+		}
+	}
+
+	// Initialize the provider registry
+	if err := api.Initialize(); err != nil {
+		if os.Getenv("LEDIT_DEBUG") != "" {
+			println("Provider registry initialization warning:", err.Error())
 		}
 	}
 }
