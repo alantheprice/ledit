@@ -11,6 +11,7 @@ import (
 type Provider interface {
 	// Core functionality
 	SendChatRequest(ctx context.Context, req *ProviderChatRequest) (*ChatResponse, error)
+	SendChatRequestStream(ctx context.Context, req *ProviderChatRequest, callback StreamCallback) (*ChatResponse, error)
 	CheckConnection(ctx context.Context) error
 
 	// Model management

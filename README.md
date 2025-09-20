@@ -21,16 +21,13 @@
     - [Slash Commands in Interactive Mode](#slash-commands-in-interactive-mode)
     - [Ignoring Files](#ignoring-files)
   - [Advanced Concepts: Prompting with Context](#advanced-concepts-prompting-with-context)
-    - [`#<filepath>` - Include a File](#filepath---include-a-file)
-    - [`#WORKSPACE` / `#WS` - Smart Context](#workspace--ws---smart-context)
-    - [`#SG "query"` - Search Grounding](#sg-query---search-grounding)
-- [Supported LLM Providers](#supported-llm-providers)
-- [MCP Server Integration](#mcp-server-integration)
-- [Documentation](#documentation)
+  - [Supported LLM Providers](#supported-llm-providers)
+  - [MCP Server Integration](#mcp-server-integration)
+  - [GitHub Action Integration (Example)](#github-action-integration-example)
+  - [Documentation](#documentation)
   - [Contributing](#contributing)
   - [File Structure](#file-structure)
     - [Key files maintained by ledit](#key-files-maintained-by-ledit)
-  - [Author's notes](#authors-notes)
   - [License](#license)
   - [Support and Community](#support-and-community)
 
@@ -143,74 +140,7 @@ ledit mcp add  # Interactive setup
 
 The configuration has domain-specific sections. Here's the current structure with defaults:
 
-```json
-{
-  "llm": {
-    "EditingModel": "deepinfra:deepseek-ai/DeepSeek-V3-0324",
-    "SummaryModel": "deepinfra:mistralai/Mistral-Small-3.2-24B-Instruct-2506",
-    "OrchestrationModel": "deepinfra:Qwen/Qwen3-Coder-480B-A35B-Instruct",
-    "WorkspaceModel": "deepinfra:meta-llama/Llama-3.3-70B-Instruct-Turbo",
-    "EmbeddingModel": "deepinfra:Qwen/Qwen3-Embedding-4B",
-    "OllamaServerURL": "http://localhost:11434",
-    "Temperature": 0.1,
-    "MaxTokens": 30000,
-    "TopP": 0.9,
-    "PresencePenalty": 0.1,
-    "FrequencyPenalty": 0.1
-  },
-  "ui": {
-    "TrackWithGit": false,
-    "JsonLogs": false,
-    "TelemetryEnabled": false
-  },
-  "agent": {
-    "OrchestrationMaxAttempts": 12,
-    "AutoGenerateTests": false,
-    "DryRun": false,
-    "CodeStyle": {
-      "FunctionSize": "Aim for smaller, single-purpose functions (under 50 lines).",
-      "FileSize": "Prefer smaller files, breaking down large components into multiple files (under 500 lines).",
-      "NamingConventions": "Use clear, descriptive names for variables, functions, and types. Follow Go conventions (camelCase for local, PascalCase for exported).",
-      "ErrorHandling": "Handle errors explicitly, returning errors as the last return value. Avoid panics for recoverable errors.",
-      "TestingApproach": "Write unit tests when practical.",
-      "Modularity": "Design components to be loosely coupled and highly cohesive.",
-      "Readability": "Prioritize code readability and maintainability. Use comments where necessary to explain complex logic."
-    }
-  },
-  "security": {
-    "EnableSecurityChecks": true,
-    "ShellAllowlist": [
-      "rm -rf node_modules",
-      "rm -fr node_modules",
-      "rm -rf ./node_modules",
-      "rm -fr ./node_modules",
-      "rm -rf node_modules/",
-      "rm -fr node_modules/",
-      "rm -rf ./node_modules/",
-      "rm -fr ./node_modules/",
-      "rm -f package-lock.json",
-      "rm -f ./package-lock.json"
-    ]
-  },
-  "performance": {
-    "FileBatchSize": 30,
-    "EmbeddingBatchSize": 30,
-    "MaxConcurrentRequests": 3,
-    "RequestDelayMs": 100,
-    "ShellTimeoutSecs": 20
-  }
-}
-```
-
-Key sections:
-
-- **`llm`**: LLM-related settings, including models and generation parameters.
-- **`ui`**: UI and logging settings, like Git tracking and telemetry.
-- **`agent`**: Agent behavior, including orchestration attempts and code style preferences.
-- **`security`**: Security checks and shell allowlist.
-- **`performance`**: Batch sizes, concurrency, and timeouts.
-
-Legacy fields are still supported for backward compatibility but are migrated to these sections.
+TODO: ADD CURRENT STRUCTURE
 
 ## Usage and Commands
 
@@ -225,7 +155,7 @@ Run `ledit init` to create `.ledit/` directory containing the workspace index, c
 - **`ledit agent [intent]`**: Core AI agent for analysis, generation, explanation, orchestration.
   ```bash
   ledit agent  # Interactive mode
-  ledit agent "Add JWT auth to API" --skip-prompt --model "deepinfra:qwen3-coder"
+  ledit agent "Add JWT auth to API" --skip-prompt --model "qwen3-coder"
   ledit agent --dry-run "Refactor main.go for modularity"
   ```
 
@@ -237,10 +167,9 @@ Run `ledit init` to create `.ledit/` directory containing the workspace index, c
 
 - **`ledit review`**: LLM code review for staged Git changes.
   ```bash
-  ledit review --model "openai:gpt-4o"
+  ledit review --model "gpt-5"
   ```
-
-- **`ledit shell [description]`**: Generate shell scripts from natural language (no execution).
+5-minie, `gpt-5-nano`dit shell [description]`**: Generate shell scripts from natural language (no execution).
   ```bash
   ledit shell "Setup React dev environment and install dependencies"
   ```
@@ -285,16 +214,12 @@ Use `#` directives in prompts for enhanced context:
 
 ## Supported LLM Providers
 
-Specify as `<provider>:<model>` (e.g., `--model "deepinfra:deepseek-coder"`).
+- **DeepInfra** (default, cost-effective): `deepseek-ai/DeepSeek-V3.1`, `qwen/Qwen3-Coder`.
+- **OpenAI**: `gpt-5`, `gpt-5-mini`, `gpt-5-nano`.
+- **Ollama** (local/Turbo): Local (`gpt-oss:120b`), Turbo (`gpt-oss:120b` - requires OLLAMA_API_KEY for remote).
+- **OpenRouter**: `anthropic/claude-3.5-sonnet`.
 
-- **DeepInfra** (default, cost-effective): `deepinfra:deepseek-ai/DeepSeek-V3`, `deepinfra:qwen/Qwen3-Coder`.
-- **OpenAI**: `openai:gpt-4o`, `openai:gpt-4-turbo`.
-- **Ollama** (local/Turbo): Local (`ollama:llama3`), Turbo (`ollama:gpt-oss:120b` - requires OLLAMA_API_KEY for remote).
-- **OpenRouter**: `openrouter:anthropic/claude-3.5-sonnet`.
-- **Gemini**: `gemini:gemini-1.5-pro`.
-- **DeepSeek**: `deepseek:deepseek-coder-v2`.
-
-Env vars: DEEPINFRA_API_KEY, OPENAI_API_KEY, etc. Ollama URL: http://localhost:11434.
+Env vars: DEEPINFRA_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY
 
 ## MCP Server Integration
 
@@ -335,19 +260,12 @@ See CONTRIBUTING.md for guidelines. Run `go test ./...` and e2e_tests/ before PR
 - **.ledit/** (project-local):
   - `workspace.json`: File index with embeddings/summaries for relevance.
   - `config.json`: Local overrides.
-  - `leditignore`: Ignore patterns (augments .gitignore).
   - `changes/`: Per-revision diff logs.
   - `runlogs/`: JSONL workflow traces.
   - `workspace.log`: Verbose execution log.
   - `embeddings/`: Vector cache for files/web content.
 - **Global (~/.ledit/)**: api_keys.json, mcp_config.json.
 - **Tests**: Unit in pkg/ (e.g., tps_tracker_test.go), integration_tests/ (git/file mods), e2e_tests/ (shell workflows), smoke_tests/ (API).
-
-## Author's notes
-
-- Defaults to DeepInfra for efficiency; switch with `/providers`.
-- Orchestration is alpha; monitor with TPS stats (`/models` shows costs).
-- Focus: Personal dev assistant with safe, contextual edits.
 
 ## License
 

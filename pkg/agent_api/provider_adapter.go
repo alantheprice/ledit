@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
 )
 
 // ProviderAdapter adapts the existing ClientInterface to the new Provider interface
@@ -35,6 +34,22 @@ func (a *ProviderAdapter) SendChatRequest(ctx context.Context, req *ProviderChat
 
 	// Call the old interface
 	return a.client.SendChatRequest(messages, tools, reasoning)
+}
+
+// SendChatRequestStream adapts the streaming interface
+func (a *ProviderAdapter) SendChatRequestStream(ctx context.Context, req *ProviderChatRequest, callback StreamCallback) (*ChatResponse, error) {
+	// Convert ProviderChatRequest to old format
+	messages := req.Messages
+	tools := req.Tools
+
+	// Determine reasoning parameter based on options
+	reasoning := ""
+	if req.Options != nil && req.Options.ReasoningEffort != "" {
+		reasoning = req.Options.ReasoningEffort
+	}
+
+	// Call the old streaming interface
+	return a.client.SendChatRequestStream(messages, tools, reasoning, callback)
 }
 
 // CheckConnection verifies connectivity

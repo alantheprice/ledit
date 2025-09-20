@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"context"
 	"fmt"
 
 	api "github.com/alantheprice/ledit/pkg/agent_api"
@@ -151,6 +152,24 @@ func (w *OpenRouterClientWrapper) ResetTPSStats() {
 
 // CreateProviderClient is a factory function that creates providers
 func CreateProviderClient(clientType api.ClientType, model string) (api.ClientInterface, error) {
+	// Try the new registry-based approach first
+	registry := api.GetProviderRegistry()
+	if registry.IsProviderAvailable(clientType) {
+		provider, err := registry.GetProvider(clientType)
+		if err == nil {
+			// Set the model if specified
+			if model != "" {
+				if err := provider.SetModel(model); err != nil {
+					return nil, fmt.Errorf("failed to set model %s for provider %s: %w", model, clientType, err)
+				}
+			}
+			// Wrap the new Provider in a ClientInterface adapter
+			return NewClientInterfaceFromProvider(provider), nil
+		}
+		// If registry fails, fall back to legacy implementations
+	}
+
+	// Legacy factory implementation for backward compatibility
 	switch clientType {
 	case api.OpenAIClientType:
 		return api.NewOpenAIClientWrapper(model)
@@ -175,4 +194,132 @@ func CreateProviderClient(clientType api.ClientType, model string) (api.ClientIn
 	default:
 		return nil, fmt.Errorf("unknown client type: %s", clientType)
 	}
+}
+
+// CreateProviderFromRegistry creates a provider using the new registry system
+func CreateProviderFromRegistry(clientType api.ClientType, model string) (api.Provider, error) {
+	registry := api.GetProviderRegistry()
+
+	provider, err := registry.GetProvider(clientType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create provider %s: %w", clientType, err)
+	}
+
+	// Set the model if specified
+	if model != "" {
+		if err := provider.SetModel(model); err != nil {
+			return nil, fmt.Errorf("failed to set model %s for provider %s: %w", model, clientType, err)
+		}
+	}
+
+	return provider, nil
+}
+
+// ProviderClientWrapper wraps the new Provider interface to implement ClientInterface
+type ProviderClientWrapper struct {
+	provider api.Provider
+}
+
+// NewClientInterfaceFromProvider creates a ClientInterface adapter for a Provider
+func NewClientInterfaceFromProvider(provider api.Provider) api.ClientInterface {
+	return &ProviderClientWrapper{provider: provider}
+}
+
+// Implement ClientInterface methods by delegating to the Provider
+
+func (w *ProviderClientWrapper) SendChatRequest(messages []api.Message, tools []api.Tool, reasoning string) (*api.ChatResponse, error) {
+	req := &api.ProviderChatRequest{
+		Messages: messages,
+		Tools:    tools,
+		Options: &api.RequestOptions{
+			ReasoningEffort: reasoning,
+		},
+	}
+	return w.provider.SendChatRequest(context.Background(), req)
+}
+
+func (w *ProviderClientWrapper) SendChatRequestStream(messages []api.Message, tools []api.Tool, reasoning string, callback api.StreamCallback) (*api.ChatResponse, error) {
+	req := &api.ProviderChatRequest{
+		Messages: messages,
+		Tools:    tools,
+		Options: &api.RequestOptions{
+			ReasoningEffort: reasoning,
+			Stream:          true,
+		},
+	}
+	return w.provider.SendChatRequestStream(context.Background(), req, callback)
+}
+
+func (w *ProviderClientWrapper) CheckConnection() error {
+	return w.provider.CheckConnection(context.Background())
+}
+
+func (w *ProviderClientWrapper) SetDebug(debug bool) {
+	w.provider.SetDebug(debug)
+}
+
+func (w *ProviderClientWrapper) SetModel(model string) error {
+	return w.provider.SetModel(model)
+}
+
+func (w *ProviderClientWrapper) GetModel() string {
+	return w.provider.GetModel()
+}
+
+func (w *ProviderClientWrapper) GetProvider() string {
+	return w.provider.GetName()
+}
+
+func (w *ProviderClientWrapper) GetModelContextLimit() (int, error) {
+	return w.provider.GetModelContextLimit()
+}
+
+func (w *ProviderClientWrapper) SupportsVision() bool {
+	return w.provider.SupportsVision()
+}
+
+func (w *ProviderClientWrapper) GetVisionModel() string {
+	// For now, return the current model - could be enhanced to return vision-specific model
+	return w.provider.GetModel()
+}
+
+func (w *ProviderClientWrapper) SendVisionRequest(messages []api.Message, tools []api.Tool, reasoning string) (*api.ChatResponse, error) {
+	// Use the regular chat request - the provider should handle vision content in messages
+	return w.SendChatRequest(messages, tools, reasoning)
+}
+
+func (w *ProviderClientWrapper) ListModels() ([]api.ModelInfo, error) {
+	// Get models from the new interface and convert to old format
+	modelDetails, err := w.provider.GetAvailableModels(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	models := make([]api.ModelInfo, len(modelDetails))
+	for i, detail := range modelDetails {
+		models[i] = api.ModelInfo{
+			ID:            detail.ID,
+			Name:          detail.Name,
+			ContextLength: detail.ContextLength,
+		}
+	}
+
+	return models, nil
+}
+
+// TPS tracking methods - not implemented by the new Provider interface
+func (w *ProviderClientWrapper) GetLastTPS() float64 {
+	return 0.0
+}
+
+func (w *ProviderClientWrapper) GetAverageTPS() float64 {
+	return 0.0
+}
+
+func (w *ProviderClientWrapper) GetTPSStats() map[string]float64 {
+	return map[string]float64{}
+}
+
+func (w *ProviderClientWrapper) ResetTPSStats() {
+	// No-op
 }
