@@ -153,6 +153,13 @@ func ParseProviderName(name string) (ClientType, error) {
 
 // IsProviderAvailable checks if a provider can be used
 func IsProviderAvailable(provider ClientType) bool {
+	// Try registry-based approach first
+	registry := GetProviderRegistry()
+	if registry.IsProviderAvailable(provider) {
+		return true
+	}
+
+	// Legacy fallback for backward compatibility
 	switch provider {
 	case OllamaClientType, OllamaLocalClientType:
 		// Ollama local is always available (we'll check actual model availability later)
@@ -172,6 +179,14 @@ func IsProviderAvailable(provider ClientType) bool {
 
 // GetAvailableProviders returns a list of all available providers
 func GetAvailableProviders() []ClientType {
+	// Try registry-based approach first
+	registry := GetProviderRegistry()
+	registryProviders := registry.ListAvailableProviders()
+	if len(registryProviders) > 0 {
+		return registryProviders
+	}
+
+	// Legacy fallback
 	providers := []ClientType{
 		OpenAIClientType,
 		DeepInfraClientType,
@@ -191,6 +206,13 @@ func GetAvailableProviders() []ClientType {
 
 // GetProviderName returns the human-readable name for a provider
 func GetProviderName(clientType ClientType) string {
+	// Try registry-based approach first
+	registry := GetProviderRegistry()
+	if config, err := registry.GetProviderConfig(clientType); err == nil {
+		return config.DisplayName
+	}
+
+	// Legacy fallback
 	switch clientType {
 	case OpenAIClientType:
 		return "OpenAI"
