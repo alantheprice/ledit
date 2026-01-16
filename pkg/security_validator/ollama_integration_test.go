@@ -21,7 +21,7 @@ func TestRealOllamaValidation(t *testing.T) {
 	// Create validator with Ollama
 	cfg := &configuration.SecurityValidationConfig{
 		Enabled:        true,
-		Model:          "qwen2.5-coder:0.5b",
+		Model:          "gemma3:270m",
 		Threshold:      1,
 		TimeoutSeconds: 30,
 	}
@@ -161,7 +161,7 @@ func TestRealOllamaValidation(t *testing.T) {
 		// Test with threshold 0 (permissive)
 		cfgPermissive := &configuration.SecurityValidationConfig{
 			Enabled:        true,
-			Model:          "qwen2.5-coder:0.5b",
+			Model:          "gemma3:270m",
 			Threshold:      0,
 			TimeoutSeconds: 30,
 		}
@@ -196,7 +196,7 @@ func TestOllamaLatency(t *testing.T) {
 
 	cfg := &configuration.SecurityValidationConfig{
 		Enabled:        true,
-		Model:          "qwen2.5-coder:0.5b",
+		Model:          "gemma3:270m",
 		Threshold:      1,
 		TimeoutSeconds: 30,
 	}

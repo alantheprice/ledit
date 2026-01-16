@@ -108,10 +108,10 @@ func NewValidator(cfg *configuration.SecurityValidationConfig, logger *utils.Log
 			logger.Logf("Skipping llama.cpp model (no file), using Ollama...")
 		}
 
-		// Use model name from config or default to qwen2.5-coder:1.5b
+		// Use model name from config or default to gemma3:270m
 		ollamaModelName := cfg.Model
 		if ollamaModelName == "" {
-			ollamaModelName = "qwen2.5-coder:1.5b"
+			ollamaModelName = "gemma3:270m"
 		}
 
 		ollamaModel, ollamaErr := loadOllamaModel(ollamaModelName)
@@ -134,10 +134,10 @@ func NewValidator(cfg *configuration.SecurityValidationConfig, logger *utils.Log
 				logger.Logf("Attempting to use Ollama as fallback...")
 			}
 
-			// Use model name from config or default to qwen2.5-coder:1.5b
+			// Use model name from config or default to gemma3:270m
 			ollamaModelName := cfg.Model
 			if ollamaModelName == "" {
-				ollamaModelName = "qwen2.5-coder:1.5b"
+				ollamaModelName = "gemma3:270m"
 			}
 
 			ollamaModel, ollamaErr := loadOllamaModel(ollamaModelName)

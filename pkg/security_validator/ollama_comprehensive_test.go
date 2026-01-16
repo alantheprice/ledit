@@ -20,7 +20,7 @@ func TestComprehensiveSecurityScenarios(t *testing.T) {
 	}
 
 	// Test both models
-	models := []string{"qwen2.5-coder:0.5b", "qwen2.5-coder:1.5b"}
+	models := []string{"gemma3:270m"}
 
 	for _, model := range models {
 		t.Run(fmt.Sprintf("Model_%s", model), func(t *testing.T) {
@@ -604,7 +604,7 @@ func TestPreFilteringCoverage(t *testing.T) {
 
 	cfg := &configuration.SecurityValidationConfig{
 		Enabled:        true,
-		Model:          "qwen2.5-coder:0.5b", // Use 0.5B for speed
+		Model:          "gemma3:270m",
 		Threshold:      1,
 		TimeoutSeconds: 30,
 	}

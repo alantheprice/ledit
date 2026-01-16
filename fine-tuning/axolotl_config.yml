@@ -1,0 +1,106 @@
+# Axolotl configuration for fine-tuning Gemma3:270m on security validation
+# Documentation: https://github.com/OpenAccess-AI-Collective/axolotl
+
+base_model: google/gemma-3-270m
+model_type: AutoModelForCausalLM
+
+# Tokenizer
+tokenizer_type: AutoTokenizer
+resize_token_embeddings_to: False  # Don't resize vocab
+
+# Data
+datasets:
+  - path: fine-tuning/output/train.jsonl
+    type: json
+    ds_type: "json"
+    conversation: completion  # Use prompt-completion format
+
+validation_datasets:
+  - path: fine-tuning/output/validation.jsonl
+    type: json
+    ds_type: "json"
+    conversation: completion
+
+# Training parameters
+learning_rate: 0.0003
+lr_scheduler: cosine
+warmup_ratio: 0.03
+optimizer: adamw_torch
+
+# Batch size (adjust based on GPU memory)
+batch_size: 8
+micro_batch_size: 4
+gradient_accumulation_steps: 2
+
+# Epochs and steps
+num_epochs: 4
+gradient_checkpointing: true
+
+# LoRA configuration (recommended for efficient fine-tuning)
+lora_r: 32
+lora_alpha: 64
+lora_dropout: 0.05
+lora_target_linear: true
+lora_fan_in_fan_out: false
+
+# Modules to apply LoRA (for Gemma)
+lora_modules:
+  - model.vision_tower
+  - model.language_model.model.layers
+  - lm_head
+
+# Special tokens
+special_tokens:
+  pad_token: <pad>
+  eos_token: <eos>
+  bos_token: <bos>
+  unk_token: <unk>
+
+# Logging
+logging_steps: 10
+save_steps: 100
+eval_steps: 100
+save_total_limit: 3
+
+# Output
+output_dir: ./fine-tuning/checkpoints
+wandb_project: ledit-security-validator
+wandb_entity: your-username  # Optional
+
+# Evaluation
+eval_max_steps: 50
+eval_table_size: 5
+
+# Hardware
+bf16: auto
+fp16: false
+torch_compile: false
+device_map: auto
+
+# Prompt template (security validation)
+prompt_template: |
+  You are a security validation assistant. Evaluate this operation:
+
+  Tool: {tool}
+  Arguments: {args}
+
+  Classify the risk level (0=SAFE, 1=CAUTION, 2=DANGEROUS) and provide reasoning.
+
+response_template: |
+  {"risk_level": {risk_level}, "reasoning": "{reasoning}", "confidence": {confidence}}
+
+# Data preprocessing
+pretraining_dataset_ratio: 1
+max_steps: -1  # Train for all epochs
+
+# Sequence length
+sequence_len: 2048  # Adjust based on average prompt length
+sample_packing: true
+pad_to_sequence_len: true
+
+# Early stopping
+early_stopping_patience: 3
+
+# Misc
+seed: 42
+debug: false

@@ -1,0 +1,35 @@
+# Model files (too large for git)
+models/
+*.gguf
+
+# Training checkpoints
+checkpoints/
+checkpoints_cpu/
+checkpoints_mps/
+checkpoints_4090/
+
+# Training logs
+*.log
+
+# Temporary files
+-daa
+-dab
+
+# Intermediate outputs (not needed for training)
+output/llamacpp_train.jsonl
+output/security_validation_prompts.txt
+output/train_small.jsonl
+output/validation.jsonl
+
+# Old/deprecated scripts
+train_model.py
+fine_tune.sh
+
+# Modelfiles (for local testing, can be regenerated)
+Modelfile
+Modelfile.*
+
+# Status/summary documents (can be regenerated)
+QUICKSTART.md
+FINAL_SUMMARY.md
+STATUS.md

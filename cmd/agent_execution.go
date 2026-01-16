@@ -268,7 +268,7 @@ func tryDirectExecution(ctx context.Context, chatAgent *agent.Agent, query strin
 		if agentConfig.SecurityValidation == nil {
 			securityConfig = &configuration.SecurityValidationConfig{
 				Enabled:        true,
-				Model:          "qwen2.5-coder:1.5b",
+				Model:          "gemma3:270m",
 				Threshold:      1,
 				TimeoutSeconds: 10,
 			}
