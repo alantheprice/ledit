@@ -63,6 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # Required to create a GitHub Release
+      workflows: write # Required to update workflow files
 
     steps:
     - name: Checkout code
