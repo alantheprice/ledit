@@ -105,6 +105,10 @@ func (ws *ReactWebServer) handleWebSocket(w http.ResponseWriter, r *http.Request
 		"data": map[string]interface{}{"connected": true, "session_id": sessionID, "client_id": clientID},
 	})
 
+	// Check for re-attachment: if client was disconnected during an active query,
+	// send missed events and sync state
+	ws.handleReattachment(clientID, sessionID, safeConn)
+
 	// Set up close handler to send disconnect status
 	conn.SetCloseHandler(func(code int, text string) error {
 		log.Printf("WebSocket %s closing with code %d: %s", sessionID, code, text)
@@ -186,7 +190,7 @@ func (ws *ReactWebServer) handleWebSocket(w http.ResponseWriter, r *http.Request
 				ws.handleWebSocketMessage(safeConn, msg, clientID)
 			}
 		}
-	}() // Write loop - handles outgoing events
+	}()  // Write loop - handles outgoing events
 	for {
 		select {
 		case <-ctx.Done():
@@ -197,7 +201,26 @@ func (ws *ReactWebServer) handleWebSocket(w http.ResponseWriter, r *http.Request
 			if !ws.shouldForwardEventToConnection(event, clientID) {
 				continue
 			}
-			if err := safeConn.WriteJSON(event); err != nil {
+			
+			// Try to send the event
+			err := safeConn.WriteJSON(event)
+			if err != nil {
+				// Connection is broken, buffer the event for later reattachment
+				// Extract chat_id from event data to know which query state to update
+				var chatID string
+				if data, ok := event.Data.(map[string]interface{}); ok {
+					if id, ok := data["chat_id"].(string); ok {
+						chatID = id
+					}
+				}
+				
+				// Buffer the event if we have a chat ID
+				// addMissedEvent will handle query ID lookup and validation atomically
+				if chatID != "" {
+					ws.addMissedEvent(clientID, chatID, "", event)
+					log.Printf("Buffered missed event %s for chat %s (connection broken)", event.Type, chatID)
+				}
+				
 				log.Printf("WebSocket %s write error: %v", sessionID, err)
 				return
 			}
@@ -761,4 +784,83 @@ func (ws *ReactWebServer) handleTerminalWebSocket(w http.ResponseWriter, r *http
 			}
 		}
 	}
+}
+
+// handleReattachment checks if client was disconnected during an active query
+// and sends any missed events upon reconnection
+func (ws *ReactWebServer) handleReattachment(clientID, sessionID string, safeConn *SafeConn) {
+	var activeChatID, queryID string
+	var queryState chatQueryState
+	var missedEvents []events.UIEvent
+	var missedEventsLenAtCapture int
+	
+	ws.mutex.RLock()
+	if ctx := ws.clientContexts[clientID]; ctx != nil {
+		activeChatID = ctx.getActiveChatID()
+		if activeChatID != "" {
+			if state, exists := ctx.ChatQueryState[activeChatID]; exists && state.IsActive {
+				queryID = state.QueryID
+				queryState = *state
+				// Capture the MissedEvents length while holding the lock to detect
+				// concurrent modifications. This is a defensive check since the
+				// QueryID and IsActive fields are protected by the lock.
+				missedEventsLenAtCapture = len(state.MissedEvents)
+			}
+		}
+	}
+	ws.mutex.RUnlock()
+
+	if queryID == "" {
+		return
+	}
+
+	// Defensive check: verify the MissedEvents slice length hasn't changed
+	// since we captured it. If it has, the state may have been modified
+	// concurrently and we should re-check the query state.
+	if ctx := ws.clientContexts[clientID]; ctx != nil {
+		if state, exists := ctx.ChatQueryState[activeChatID]; exists && state.IsActive {
+			// Re-check state if missed events length changed OR query ID changed
+			if len(state.MissedEvents) != missedEventsLenAtCapture || 
+				(queryState.QueryID != "" && state.QueryID != queryState.QueryID) {
+				log.Printf("MissedEvents slice or query ID changed during reattachment for query %s, re-checking state", queryID)
+				queryState = *state
+				missedEventsLenAtCapture = len(state.MissedEvents)
+			}
+		}
+	}
+
+	// Get any missed events that were buffered during disconnect
+	// We pass queryState to ensure consistency with the state we observed
+	missedEvents = ws.getMissedEvents(clientID, activeChatID, queryID, queryState)
+	if len(missedEvents) == 0 {
+		return
+	}
+
+	// Send connection restored event with metadata about missed events
+	safeConn.WriteJSON(map[string]interface{}{
+		"type": "connection_restored",
+		"data": map[string]interface{}{
+			"session_id":         sessionID,
+			"client_id":          clientID,
+			"chat_id":            activeChatID,
+			"query_id":           queryID,
+			"missed_event_count": len(missedEvents),
+			"timestamp":          time.Now().Unix(),
+		},
+	})
+
+	// Send all missed events
+	successCount := 0
+	for i, event := range missedEvents {
+		if err := safeConn.WriteJSON(event); err != nil {
+			log.Printf("Failed to send missed event %d during reattachment: %v, stopping", 
+				i, err)
+			// Stop on first failure - connection is likely broken
+			break
+		}
+		successCount++
+	}
+
+	log.Printf("Reattached to query %s for client %s, sent %d/%d missed events", 
+		queryID, clientID, successCount, len(missedEvents))
 }

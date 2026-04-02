@@ -11,6 +11,7 @@ import (
 
 	"github.com/alantheprice/ledit/pkg/agent"
 	api "github.com/alantheprice/ledit/pkg/agent_api"
+	"github.com/alantheprice/ledit/pkg/events"
 )
 
 const (
@@ -34,11 +35,24 @@ type webClientContext struct {
 	ActiveQuery      bool
 	LastSeenAt       time.Time
 
+	// Per-chat query tracking for re-attachment support
+	ChatQueryState map[string]*chatQueryState
+
 	// Multi-chat support: one client context (tab) can have multiple
 	// independent chat sessions, each with its own agent state.
 	ChatSessions   map[string]*chatSession
 	DefaultChatID  string
 	nextChatNumber int
+}
+
+// chatQueryState tracks the state of an in-progress query for a specific chat
+type chatQueryState struct {
+	QueryID        string       // Unique UUID for this query
+	QueryText      string       // The original user query
+	StartedAt      time.Time    // When the query started
+	IsActive       bool         // Whether query is still running
+	MissedEvents   []events.UIEvent // Buffered events from this query while disconnected
+	LastSentAt     time.Time    // When events were last sent (for timeout cleanup)
 }
 
 func newWebClientContext(workspaceRoot, sshHostAlias, sshSessionKey, sshLauncherURL, sshHomePath string) *webClientContext {
@@ -137,6 +151,7 @@ func (ws *ReactWebServer) getOrCreateClientContextLocked(clientID string) *webCl
 			FileConsents:   ws.fileConsents,
 			AgentState:     emptyAgentStateSnapshot(),
 			LastSeenAt:     time.Now(),
+			ChatQueryState: make(map[string]*chatQueryState),
 		}
 		if ctx.Terminal == nil {
 			ctx.Terminal = NewTerminalManager(ctx.WorkspaceRoot)
@@ -541,7 +556,19 @@ func (ws *ReactWebServer) cleanupInactiveClientContexts(maxIdle time.Duration) i
 		if _, connected := connectedClientIDs[clientID]; connected {
 			continue
 		}
+		// Check if any chat session has an active query
+		hasActiveQuery := false
 		if ctx.ActiveQuery {
+			hasActiveQuery = true
+		} else if ctx.ChatQueryState != nil {
+			for _, queryState := range ctx.ChatQueryState {
+				if queryState.IsActive {
+					hasActiveQuery = true
+					break
+				}
+			}
+		}
+		if hasActiveQuery {
 			continue
 		}
 		if ctx.LastSeenAt.IsZero() || now.Sub(ctx.LastSeenAt) < maxIdle {
@@ -580,4 +607,200 @@ func (ws *ReactWebServer) startClientContextCleanupWorker(ctx context.Context, i
 			ws.cleanupInactiveClientContexts(maxIdle)
 		}
 	}
+}
+
+// chatQueryState management methods
+
+// getOrCreateChatQueryState returns or creates query state for a chat
+func (ws *ReactWebServer) getOrCreateChatQueryState(clientID, chatID string) *chatQueryState {
+	ws.mutex.Lock()
+	defer ws.mutex.Unlock()
+
+	if ws.clientContexts == nil {
+		ws.clientContexts = make(map[string]*webClientContext)
+	}
+
+	ctx := ws.clientContexts[clientID]
+	if ctx == nil {
+		// Create client context if it doesn't exist
+		ctx = &webClientContext{
+			ChatQueryState: make(map[string]*chatQueryState),
+		}
+		ws.clientContexts[clientID] = ctx
+	}
+
+	if ctx.ChatQueryState == nil {
+		ctx.ChatQueryState = make(map[string]*chatQueryState)
+	}
+
+	if state, exists := ctx.ChatQueryState[chatID]; exists {
+		return state
+	}
+
+	// Create new query state
+	ctx.ChatQueryState[chatID] = &chatQueryState{
+		IsActive:       false,
+		MissedEvents:   make([]events.UIEvent, 0),
+		LastSentAt:     time.Time{},
+	}
+	return ctx.ChatQueryState[chatID]
+}
+
+// startQuery marks a query as active and initializes its state
+// Caller must hold ws.mutex.Lock()
+func (ws *ReactWebServer) startQuery(clientID, chatID, queryID, queryText string) {
+	ctx := ws.clientContexts[clientID]
+	if ctx == nil {
+		ctx = &webClientContext{
+			ChatQueryState: make(map[string]*chatQueryState),
+		}
+		ws.clientContexts[clientID] = ctx
+	}
+
+	if ctx.ChatQueryState == nil {
+		ctx.ChatQueryState = make(map[string]*chatQueryState)
+	}
+
+	ctx.ChatQueryState[chatID] = &chatQueryState{
+		QueryID:        queryID,
+		QueryText:      queryText,
+		StartedAt:      time.Now(),
+		IsActive:       true,
+		MissedEvents:   make([]events.UIEvent, 0),
+		LastSentAt:     time.Now(),
+	}
+}
+
+// startQueryUnlocked is a wrapper that acquires the lock before calling startQuery
+func (ws *ReactWebServer) startQueryUnlocked(clientID, chatID, queryID, queryText string) {
+	ws.mutex.Lock()
+	defer ws.mutex.Unlock()
+	ws.startQuery(clientID, chatID, queryID, queryText)
+}
+
+// startQueryWithLockAcquired is for internal use when caller already holds the lock
+func (ws *ReactWebServer) startQueryWithLockAcquired(clientID, chatID, queryID, queryText string) {
+	ws.startQuery(clientID, chatID, queryID, queryText)
+}
+
+// endQuery marks a query as completed and clears its state
+func (ws *ReactWebServer) endQuery(clientID, chatID string) {
+	ws.mutex.Lock()
+	defer ws.mutex.Unlock()
+
+	ctx := ws.clientContexts[clientID]
+	if ctx == nil || ctx.ChatQueryState == nil {
+		return
+	}
+
+	if state, exists := ctx.ChatQueryState[chatID]; exists {
+		state.IsActive = false
+		// Clear query state after completion to free memory
+		delete(ctx.ChatQueryState, chatID)
+	}
+}
+
+// addMissedEvent buffers an event that was published while client was disconnected
+func (ws *ReactWebServer) addMissedEvent(clientID, chatID, queryID string, event events.UIEvent) {
+	ws.mutex.Lock()
+	defer ws.mutex.Unlock()
+
+	ctx := ws.clientContexts[clientID]
+	if ctx == nil || ctx.ChatQueryState == nil {
+		return
+	}
+
+	state, exists := ctx.ChatQueryState[chatID]
+	if !exists || !state.IsActive {
+		return
+	}
+
+	// If queryID was not provided, look it up from the state
+	if queryID == "" {
+		queryID = state.QueryID
+	}
+
+	// Only buffer events for the active query
+	if state.QueryID != queryID {
+		return
+	}
+
+	// Limit buffer to last 50 events per query to prevent memory bloat
+	if len(state.MissedEvents) >= 50 {
+		// Remove oldest event
+		state.MissedEvents = state.MissedEvents[1:]
+	}
+
+	state.MissedEvents = append(state.MissedEvents, event)
+	state.LastSentAt = time.Now()
+}
+
+// getMissedEvents returns buffered events for a query and clears them
+// Also cleans up events that are too old (older than 10 minutes) to prevent memory leaks
+// queryState is the state captured while holding the read lock in handleReattachment,
+// used to ensure we're working with the same state we observed
+func (ws *ReactWebServer) getMissedEvents(clientID, chatID, queryID string, queryState chatQueryState) []events.UIEvent {
+	ws.mutex.Lock()
+	defer ws.mutex.Unlock()
+
+	ctx := ws.clientContexts[clientID]
+	if ctx == nil || ctx.ChatQueryState == nil {
+		return nil
+	}
+
+	state, exists := ctx.ChatQueryState[chatID]
+	if !exists || state.QueryID != queryID || !state.IsActive {
+		return nil
+	}
+
+	// Verify the state we captured is still valid (queryID hasn't changed)
+	if queryState.QueryID != "" && queryState.QueryID != state.QueryID {
+		// Query state changed between read lock and write lock acquisition
+		return nil
+	}
+
+	// Clean up old events (older than 10 minutes) to prevent memory leaks
+	const maxEventAge = 10 * time.Minute
+	if !state.LastSentAt.IsZero() && time.Since(state.LastSentAt) > maxEventAge {
+		// Events are too old, discard them
+		return nil
+	}
+
+	eventList := state.MissedEvents
+	state.MissedEvents = make([]events.UIEvent, 0)
+	state.LastSentAt = time.Now()
+
+	return eventList
+}
+
+// hasActiveQueryForChat returns whether a chat has an active query
+func (ws *ReactWebServer) hasActiveQueryForChat(clientID, chatID string) bool {
+	ws.mutex.RLock()
+	defer ws.mutex.RUnlock()
+
+	ctx := ws.clientContexts[clientID]
+	if ctx == nil || ctx.ChatQueryState == nil {
+		return false
+	}
+
+	state, exists := ctx.ChatQueryState[chatID]
+	return exists && state.IsActive
+}
+
+// getActiveQueryID returns the query ID if there's an active query for a chat
+func (ws *ReactWebServer) getActiveQueryID(clientID, chatID string) string {
+	ws.mutex.RLock()
+	defer ws.mutex.RUnlock()
+
+	ctx := ws.clientContexts[clientID]
+	if ctx == nil || ctx.ChatQueryState == nil {
+		return ""
+	}
+
+	state, exists := ctx.ChatQueryState[chatID]
+	if !exists || !state.IsActive {
+		return ""
+	}
+
+	return state.QueryID
 }

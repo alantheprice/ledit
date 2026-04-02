@@ -37,9 +37,10 @@ const (
 
 // EventBus manages event distribution between CLI and Web UI
 type EventBus struct {
-	subscribers map[string]chan UIEvent
-	mutex       sync.RWMutex
-	nextID      int64
+	subscribers    map[string]chan UIEvent
+	subscriberIdx  map[string]int // Track last event index per subscriber for gap detection
+	mutex          sync.RWMutex
+	nextID         int64
 }
 
 // NewEventBus creates a new event bus
@@ -56,6 +57,13 @@ func (eb *EventBus) Subscribe(name string) <-chan UIEvent {
 
 	ch := make(chan UIEvent, 100) // Buffered channel
 	eb.subscribers[name] = ch
+	
+	// Initialize index tracking for this subscriber
+	if eb.subscriberIdx == nil {
+		eb.subscriberIdx = make(map[string]int)
+	}
+	eb.subscriberIdx[name] = 0
+	
 	return ch
 }
 
@@ -81,8 +89,10 @@ func (eb *EventBus) Publish(eventType string, data any) {
 		Data:      data,
 	}
 	subscribers := make([]chan UIEvent, 0, len(eb.subscribers))
-	for _, ch := range eb.subscribers {
+	for name, ch := range eb.subscribers {
 		subscribers = append(subscribers, ch)
+		// Track event index for gap detection
+		eb.subscriberIdx[name]++
 	}
 	eb.mutex.Unlock()
 
@@ -95,6 +105,32 @@ func (eb *EventBus) Publish(eventType string, data any) {
 			// This prevents blocking if a subscriber is slow
 		}
 	}
+}
+
+// GetMissedEvents returns events that were published since the last time
+// the subscriber received events. Returns nil if no events were missed.
+func (eb *EventBus) GetMissedEvents(name string, lastIndex int) []UIEvent {
+	eb.mutex.RLock()
+	defer eb.mutex.RUnlock()
+
+	currentIdx, exists := eb.subscriberIdx[name]
+	if !exists || currentIdx <= lastIndex {
+		return nil
+	}
+
+	// Note: We cannot return the actual missed events here because the EventBus
+	// doesn't store historical events. The actual gap detection and event retrieval
+	// is handled at the webui layer via chatQueryState.
+	// This method is kept for potential future use or API compatibility.
+	return nil
+}
+
+// GetSubscriberIndex returns the current event index for a subscriber
+func (eb *EventBus) GetSubscriberIndex(name string) int {
+	eb.mutex.RLock()
+	defer eb.mutex.RUnlock()
+
+	return eb.subscriberIdx[name]
 }
 
 // generateEventID creates a unique event ID

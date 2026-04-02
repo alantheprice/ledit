@@ -106,6 +106,9 @@ func (ws *ReactWebServer) handleAPIQuery(w http.ResponseWriter, r *http.Request)
 	clientID := ws.resolveClientID(r)
 	chatID := ws.resolveChatID(r, clientID)
 
+	// Generate unique query ID for re-attachment support
+	queryID := fmt.Sprintf("query_%d_%d", time.Now().UnixNano(), ws.queryCount+1)
+
 	ws.mutex.RLock()
 	ctx := ws.clientContexts[clientID]
 	if ctx == nil {
@@ -133,6 +136,8 @@ func (ws *ReactWebServer) handleAPIQuery(w http.ResponseWriter, r *http.Request)
 	ws.activeQueries++
 	if ctx := ws.clientContexts[clientID]; ctx != nil {
 		ctx.setChatQueryActive(chatID, true, query.Query)
+		// Track query state for re-attachment (caller already holds lock)
+		ws.startQueryWithLockAcquired(clientID, chatID, queryID, query.Query)
 	}
 	ws.mutex.Unlock()
 
@@ -146,6 +151,8 @@ func (ws *ReactWebServer) handleAPIQuery(w http.ResponseWriter, r *http.Request)
 			if ctx := ws.clientContexts[clientID]; ctx != nil {
 				ctx.setChatQueryActive(chatID, false, "")
 			}
+			// Always end the query to clear state
+			ws.endQuery(clientID, chatID)
 			ws.mutex.Unlock()
 		}()
 		startedAt := time.Now()
@@ -159,6 +166,7 @@ func (ws *ReactWebServer) handleAPIQuery(w http.ResponseWriter, r *http.Request)
 				clientAgent.GetModel(),
 			)
 			queryEventData["chat_id"] = chatID
+			queryEventData["query_id"] = queryID
 			ws.publishClientEvent(clientID, events.EventTypeQueryStarted, queryEventData)
 
 			clientAgent.SetWorkspaceRoot(workspaceRoot)

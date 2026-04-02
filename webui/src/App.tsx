@@ -100,6 +100,8 @@ interface AppState {
   subagentActivities: SubagentActivity[];
   activeChatId: string | null;
   chatSessions: ChatSession[];
+  // Query ID for re-attachment support (persisted to sessionStorage)
+  activeQueryId: string | null;
   // Snapshot of per-chat state, saved on switch-away and restored on switch-back
   perChatCache: Record<string, {
     messages: Message[];
@@ -360,6 +362,7 @@ function App() {
       lastError: null,
       queryProgress: null,
       activeChatId: null,
+      activeQueryId: null,
       chatSessions: [],
       perChatCache: {},
     };
@@ -374,6 +377,43 @@ function App() {
   const queuedMessagesRef = useRef<string[]>([]);
   const activeChatIdRef = useRef<string | null>(null);
   activeChatIdRef.current = state.activeChatId;
+  
+  // Generate a unique tab ID for sessionStorage key isolation
+  const tabId = typeof window !== 'undefined' 
+    ? window.sessionStorage.getItem('ledit:tab_id') 
+    : null;
+  const uniqueTabId = tabId || crypto.randomUUID();
+  if (typeof window !== 'undefined' && !tabId) {
+    try {
+      window.sessionStorage.setItem('ledit:tab_id', uniqueTabId);
+    } catch (e) {
+      // Ignore quota errors
+    }
+  }
+  const sessionStorageKey = `ledit:active_query_id:${uniqueTabId}`;
+  
+  // Track active query ID for re-attachment support
+  const activeQueryIdRef = useRef<string | null>(null);
+  activeQueryIdRef.current = state.activeQueryId;
+  
+  // Sync query ID to sessionStorage for survival across tab freeze
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (state.activeQueryId) {
+      try {
+        window.sessionStorage.setItem(sessionStorageKey, state.activeQueryId);
+      } catch (e) {
+        // Ignore quota errors
+      }
+    } else {
+      try {
+        window.sessionStorage.removeItem(sessionStorageKey);
+      } catch (e) {
+        // Ignore quota errors
+      }
+    }
+  }, [state.activeQueryId, sessionStorageKey]);
+  
   const [queuedMessagesCount, setQueuedMessagesCount] = useState(0);
   const [recentFiles, setRecentFiles] = useState<Array<{ path: string; modified: boolean }>>([]);
   const [gitRefreshToken, setGitRefreshToken] = useState(0);
@@ -793,11 +833,13 @@ function App() {
         logEntry.category = 'query';
         logEntry.level = 'info';
         const startedQuery = event.data?.query || '';
+        const startedQueryId = event.data?.query_id || null;
         setState(prev => ({
           ...prev,
           isProcessing: true,
           lastError: null,
           queryCount: prev.queryCount + 1,
+          activeQueryId: startedQueryId, // Track query ID for re-attachment
           messages: [...prev.messages, {
             id: Date.now().toString(),
             type: 'user',
@@ -811,7 +853,7 @@ function App() {
           currentTodos: [],    // Clear previous todos
           logs: [...prev.logs, logEntry]
         }));
-        debugLog('[>>] Query started:', startedQuery);
+        debugLog('[>>] Query started:', startedQuery, startedQueryId ? `id=${startedQueryId}` : '');
         break;
 
       case 'query_progress':
@@ -880,6 +922,14 @@ function App() {
           setQueuedMessagesCount(0);
         }
         setState(prev => {
+          // Clear active query ID on completion
+          const newQueryId = wasClearCommand ? null : prev.activeQueryId;
+          
+          // Clear sessionStorage on completion
+          if (typeof window !== 'undefined' && newQueryId === null) {
+            window.sessionStorage.removeItem('ledit:active_query_id');
+          }
+          
           let nextMessages = wasClearCommand
             ? []
             : ensureCompletedAssistantMessage(prev.messages, completedResponse, (responseText) => ({
@@ -918,6 +968,7 @@ function App() {
             isProcessing: activeRequestsRef.current > 0,
             lastError: null,
             queryProgress: null,
+            activeQueryId: newQueryId,
             toolExecutions: wasClearCommand
               ? []
               : prev.toolExecutions.map((tool) => {
@@ -1267,6 +1318,7 @@ function App() {
           isProcessing: activeRequestsRef.current > 0,
           queryProgress: null,
           lastError: errorMessage,
+          activeQueryId: null, // Clear query ID on error
           messages: [...prev.messages, {
             id: Date.now().toString(),
             type: 'assistant',
@@ -1302,6 +1354,38 @@ function App() {
         }
         break;
 
+      case 'connection_restored':
+        logEntry.category = 'system';
+        logEntry.level = 'info';
+        const missedCount = event.data?.missed_event_count || 0;
+        const restoredQueryId = event.data?.query_id || null;
+        const restoredChatId = event.data?.chat_id || null;
+        
+        // Update active query ID if it matches what we're reconnecting to
+        if (restoredQueryId && restoredQueryId === state.activeQueryId) {
+          debugLog(`[reconnect] Restored connection to query ${restoredQueryId}, missed ${missedCount} events`);
+          
+          // Show notification about missed events
+          if (missedCount > 0) {
+            setState(prev => ({
+              ...prev,
+              logs: [...prev.logs, {
+                ...logEntry,
+                message: `Reconnected to in-progress query. ${missedCount} events were buffered while disconnected.`,
+                level: 'info'
+              }]
+            }));
+          }
+        } else if (restoredQueryId) {
+          // Query ID changed - this might be a new query that started while we were disconnected
+          debugLog(`[reconnect] Reconnected, but query ID changed from ${state.activeQueryId} to ${restoredQueryId}`);
+          setState(prev => ({
+            ...prev,
+            activeQueryId: restoredQueryId
+          }));
+        }
+        break;
+
       default:
         // Handle any unknown event types
         logEntry.level = 'warning';
@@ -1324,6 +1408,26 @@ function App() {
     // Initialize WebSocket connection
     wsService.connect();
     wsService.onEvent(handleEvent);
+
+    // Set up reconnection callback to handle restored query state
+    wsService.onReconnect(() => {
+      debugLog('[ws] Reconnected - checking for in-progress query');
+      
+      // Check if we had an active query before disconnect (use tab-specific key)
+      const tabId = typeof window !== 'undefined' 
+        ? window.sessionStorage.getItem('ledit:tab_id') 
+        : null;
+      const uniqueTabId = tabId || crypto.randomUUID();
+      const sessionStorageKey = `ledit:active_query_id:${uniqueTabId}`;
+      
+      const savedQueryId = window.sessionStorage.getItem(sessionStorageKey);
+      if (savedQueryId && savedQueryId === state.activeQueryId) {
+        debugLog(`[ws] Reconnected to query: ${savedQueryId}`);
+        // Note: The actual reconnection handling is done by the handleEvent
+        // function via the 'connection_restored' event, which processes
+        // any missed events from the reattached query.
+      }
+    });
 
     // Load initial stats
     const loadStats = () => {
