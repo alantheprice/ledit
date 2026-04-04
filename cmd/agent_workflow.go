@@ -606,7 +606,7 @@ func prepareWorkflowRuntimeRestorer(chatAgent *agent.Agent, cfg *AgentWorkflowCo
 		OriginalModel    string
 		OriginalKey      string
 	}{}
-	var allOverrides WorkflowSubagentOverrides
+	allOverrides := make(WorkflowSubagentOverrides)
 	if cfg.Initial != nil {
 		for k, v := range cfg.Initial.SubagentOverrides {
 			allOverrides[k] = v

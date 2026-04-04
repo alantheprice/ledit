@@ -10,17 +10,26 @@ android {
     defaultConfig {
         applicationId "com.ledit.android"
         minSdk 24
-        targetSdk 34
+        targetSdk 33
         versionCode 1
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        
+        // Enable external native build
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+        }
     }
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
         }
     }
 
@@ -35,6 +44,32 @@ android {
 
     buildFeatures {
         viewBinding true
+        buildConfig true
+    }
+    
+    // Source sets for native libraries and AAR
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['libs']
+        }
+    }
+    
+    // External native build configuration
+    externalNativeBuild {
+        ndkBuild {
+            path 'src/main/jni/Android.mk'
+        }
+    }
+    
+    // NDK configuration
+    ndkVersion "26b"
+}
+
+// Include Go AAR when built
+def aarFile = file('libs/ledit.aar')
+if (aarFile.exists()) {
+    dependencies {
+        implementation files('libs/ledit.aar')
     }
 }
 
