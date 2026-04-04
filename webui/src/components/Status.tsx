@@ -39,7 +39,7 @@ const Status: React.FC<StatusProps> = ({ isConnected, position = 'top', stats })
   };
 
   const formatCost = (cost: number): string => {
-    return `$${cost.toFixed(4)}`;
+    return `$${cost.toFixed(2)}`;
   };
 
   const getContextStatus = () => {
@@ -57,17 +57,12 @@ const Status: React.FC<StatusProps> = ({ isConnected, position = 'top', stats })
     <div className={`status-bar ${position === 'bottom' ? 'status-bar-bottom' : 'status-bar-top'} ${isConnected ? 'connected' : 'disconnected'}`}>
       <div className="status-indicator">
         <span className={`indicator ${isConnected ? 'on' : 'off'}`}></span>
-        <span className="status-text">
+        <span className="status-text desktop-only">
           {isConnected ? 'Connected to ledit server' : 'Backend not connected - Start with: ./ledit agent'}
         </span>
       </div>
 
       <div className="status-info">
-        {/* Connection Status */}
-        <span className={`status-item status-item-primary ${isConnected ? 'connected' : 'disconnected'}`}>
-          WebSocket: {isConnected ? 'Live' : 'Offline'}
-        </span>
-
         {!isConnected && (
           <span className="status-item disconnected-help status-item-priority">
             Run: <code>./ledit agent</code> in parent directory
@@ -76,47 +71,57 @@ const Status: React.FC<StatusProps> = ({ isConnected, position = 'top', stats })
 
         {isConnected && stats && (
           <>
-            {/* Provider and Model */}
-            <span className="status-item status-item-priority">
+            {/* Provider and Model - desktop: full, mobile: model only */}
+            <span className="status-item status-item-priority desktop-only">
               {stats.provider}:{stats.model}
             </span>
+            <span className="status-item status-item-priority mobile-only">
+              {stats.model}
+            </span>
 
-            {/* Token Usage */}
-            <span className="status-item status-item-priority" title={`Prompt: ${formatTokens(stats.prompt_tokens || 0)} | Completion: ${formatTokens(stats.completion_tokens || 0)} | Cached: ${formatTokens(stats.cached_tokens || 0)}`}>
+            {/* Token Usage - desktop only */}
+            <span className="status-item status-item-priority desktop-only" title={`Prompt: ${formatTokens(stats.prompt_tokens || 0)} | Completion: ${formatTokens(stats.completion_tokens || 0)} | Cached: ${formatTokens(stats.cached_tokens || 0)}`}>
               Tokens: {formatTokens(stats.total_tokens || 0)}
             </span>
 
-            {/* Context Usage */}
-            <span className={`status-item status-item-priority context-${contextStatus}`} title={`Current: ${formatTokens(stats.current_context_tokens || 0)} / Max: ${formatTokens(stats.max_context_tokens || 0)}`}>
-              Context: {stats.context_usage_percent !== undefined && stats.context_usage_percent !== null ? `${stats.context_usage_percent.toFixed(1)}%` : 'N/A'}
+            {/* Context Usage - desktop */}
+            <span className={`status-item status-item-priority desktop-only context-${contextStatus}`} title={`Current: ${formatTokens(stats.current_context_tokens || 0)} / Max: ${formatTokens(stats.max_context_tokens || 0)}`}>
+              {stats.context_usage_percent !== undefined && stats.context_usage_percent !== null ? `${stats.context_usage_percent.toFixed(1)}%` : 'N/A'}
             </span>
 
-            {/* Cache Efficiency */}
+            {/* Context Usage - mobile compact */}
+            <span className={`status-item status-item-priority mobile-only context-${contextStatus}`}>
+              {stats.context_usage_percent !== undefined && stats.context_usage_percent !== null
+                ? `${stats.context_usage_percent.toFixed(0)}% ${formatTokens(stats.current_context_tokens || 0)}/${formatTokens(stats.max_context_tokens || 0)}`
+                : 'N/A'}
+            </span>
+
+            {/* Cache Efficiency - has status-item-secondary hidden at 768px already */}
             {(stats.cache_efficiency || 0) > 0 && (
-              <span className="status-item status-item-secondary" title="Cache efficiency percentage">
+              <span className="status-item status-item-secondary desktop-only" title="Cache efficiency percentage">
                 Cache: {stats.cache_efficiency?.toFixed(1)}%
               </span>
             )}
 
-            {/* Cost */}
-            <span className="status-item status-item-secondary" title={`Total: ${formatCost(stats.total_cost || 0)} | Saved: ${formatCost(stats.cached_cost_savings || 0)}`}>
-              Cost: {formatCost(stats.total_cost || 0)}
+            {/* Cost - visible on both desktop and mobile */}
+            <span className="status-item status-item-priority" title={`Total: ${formatCost(stats.total_cost || 0)} | Saved: ${formatCost(stats.cached_cost_savings || 0)}`}>
+              {formatCost(stats.total_cost || 0)}
             </span>
 
-            {/* TPS */}
+            {/* TPS - desktop only */}
             {stats.last_tps && stats.last_tps > 0 && (
-              <span className="status-item status-item-secondary" title="Tokens per second">
+              <span className="status-item status-item-secondary desktop-only" title="Tokens per second">
                 TPS: {stats.last_tps.toFixed(1)}
               </span>
             )}
 
-            {/* Iterations */}
-            <span className="status-item status-item-priority" title={`Current: ${stats.current_iteration || 0} / Max: ${stats.max_iterations || 0}`}>
+            {/* Iterations - desktop only */}
+            <span className="status-item status-item-priority desktop-only" title={`Current: ${stats.current_iteration || 0} / Max: ${stats.max_iterations || 0}`}>
               Iter: {stats.current_iteration || 0}/{stats.max_iterations || 0}
             </span>
 
-            {/* Status Indicators */}
-            <span className="status-item status-item-secondary">
+            {/* Status Indicators - desktop only */}
+            <span className="status-item status-item-secondary desktop-only">
               {stats.streaming_enabled && (
                 <span className="status-badge streaming" title="Streaming enabled">S</span>
               )}

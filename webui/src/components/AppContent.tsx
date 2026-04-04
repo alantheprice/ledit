@@ -674,12 +674,21 @@ const AppContent: React.FC<AppContentProps> = ({
         case 'toggle_minimap':
           document.dispatchEvent(new CustomEvent('editor-toggle-minimap'));
           break;
+        case 'zoom_in':
+          zoomIn();
+          break;
+        case 'zoom_out':
+          zoomOut();
+          break;
+        case 'zoom_reset':
+          resetZoom();
+          break;
       }
     };
     
     window.addEventListener('ledit:hotkey', handleHotkey);
     return () => window.removeEventListener('ledit:hotkey', handleHotkey);
-  }, [activeBufferId, activePaneId, buffers, closeAllBuffers, closeBuffer, closeOtherBuffers, focusTabIndex, handlePrimaryViewChange, handleSplitRequest, onSidebarToggle, onTerminalExpandedChange, isTerminalExpanded, openWorkspaceBuffer, onViewChange, saveAllBuffers, switchPane, switchToBuffer]);
+  }, [activeBufferId, activePaneId, buffers, closeAllBuffers, closeBuffer, closeOtherBuffers, focusTabIndex, handlePrimaryViewChange, handleSplitRequest, onSidebarToggle, onTerminalExpandedChange, isTerminalExpanded, openWorkspaceBuffer, onViewChange, saveAllBuffers, switchPane, switchToBuffer, zoomIn, zoomOut, resetZoom]);
 
   // Handler to open hotkeys config in editor
   const handleOpenHotkeysConfig = useCallback(() => {

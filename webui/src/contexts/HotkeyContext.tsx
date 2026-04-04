@@ -62,6 +62,12 @@ const fallbackHotkeys: HotkeyEntry[] = [
   { key: 'Alt+1', command_id: 'switch_to_editor', global: false },
   { key: 'Alt+2', command_id: 'switch_to_chat', global: false },
   { key: 'Alt+3', command_id: 'switch_to_git', global: false },
+  { key: 'Ctrl+Shift+=', command_id: 'zoom_in', global: true },
+  { key: 'Cmd+Shift+=', command_id: 'zoom_in', global: true },
+  { key: 'Ctrl+Shift+-', command_id: 'zoom_out', global: true },
+  { key: 'Cmd+Shift+-', command_id: 'zoom_out', global: true },
+  { key: 'Ctrl+Shift+0', command_id: 'zoom_reset', global: true },
+  { key: 'Cmd+Shift+0', command_id: 'zoom_reset', global: true },
 ];
 
 // Key mapping for special keys
