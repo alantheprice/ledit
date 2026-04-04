@@ -99,6 +99,7 @@ const Terminal: React.FC<TerminalProps> = ({
     }
   }, [externalIsExpanded]);
 
+  // ── Sync CSS variable so .app's padding-bottom matches the terminal height ──
   useEffect(() => {
     const reservedHeight = isExpanded ? terminalHeight : collapsedHeight;
     document.documentElement.style.setProperty('--ledit-terminal-reserved-height', `${reservedHeight}px`);

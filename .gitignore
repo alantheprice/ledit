@@ -57,6 +57,8 @@ debug_logs/
 ui_test_logs/
 tool_calls.log
 e2e_results.csv
+auto_runner.log
+auto_runner_*.log
 
 # Common build and dependency directories
 node_modules/

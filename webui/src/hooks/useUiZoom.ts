@@ -35,9 +35,13 @@ function readAppliedZoom(): number {
 
 function applyZoom(zoomLevel: number): void {
   if (typeof window === 'undefined') return;
+  const factor = zoomLevel / 100;
   // CSS `zoom` is not yet in TS DOM typings despite broad browser support.
   // See: https://developer.mozilla.org/en-US/docs/Web/CSS/zoom
-  (document.documentElement.style as any).zoom = `${zoomLevel / 100}`;
+  (document.documentElement.style as any).zoom = `${factor}`;
+  // Expose the zoom factor so other components can compensate fixed positioning.
+  document.documentElement.style.setProperty('--ledit-zoom-factor', String(factor));
+  (window as any).__leditZoomFactor = factor;
 }
 
 function storeZoom(zoomLevel: number): void {

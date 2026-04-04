@@ -479,7 +479,7 @@ body {
   background-clip: padding-box;
 }
 
-html, body, #root {
+body, #root {
   height: 100%;
 }
 

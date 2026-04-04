@@ -1,0 +1,24 @@
+
+[1mAndroid App Implementation - Interactive Mode[0m
+
+Base path: /data/data/com.termux/files/home/dev/personal/ledit/docs/android-app-spec
+
+
+[1mAvailable Components:[0m
+  1. 01-go-mobile - Go Mobile Bindings (0/11 done, 11 pending)
+  2. 02-terminal-pty - Terminal PTY Subsystem (0/19 done, 19 pending)
+  3. 03-emulator-view - Terminal Emulator View (0/20 done, 20 pending)
+  4. 05-android-shell - Android App Shell (0/34 done, 34 pending)
+  5. 04-webui-integration - WebUI Integration (1/43 done, 42 pending)
+  6. 06-background-service - Background Service (0/63 done, 63 pending)
+  7. 07-shell-bundle - Shell Bundle (0/14 done, 14 pending)
+
+Commands:
+  <number>  - Show component details
+  s <num>   - Show component spec summary
+  c <id>    - Mark todo complete (e.g., c 01-go-mobile: T001)
+  l         - List all todos
+  q         - Quit
+
+[1m> [0m
+Exiting.
