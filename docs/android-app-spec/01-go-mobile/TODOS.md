@@ -30,7 +30,7 @@ Compile Go ledit code to an Android library using gomobile.
 
 | Status | Todo Item | Completion Criteria |
 |--------|-----------|---------------------|
-| pending | Run `gomobile bind` | Generates .aar library without errors |
+| completed | Run `gomobile bind` | Generates .aar library without errors |
 | completed | Verify .aar output | File exists in output directory |
 | completed | Verify Java wrappers | Java classes generated in output |
 | completed | Test integration | Library builds in Android project |

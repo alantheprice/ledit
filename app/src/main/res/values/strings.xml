@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App name -->
+    <string name="app_name">Ledit Android</string>
+    
+    <!-- Navigation -->
+    <string name="nav_terminal">Terminal</string>
+    <string name="nav_webui">WebUI</string>
+    <string name="nav_settings">Settings</string>
+    
+    <!-- Notification strings -->
+    <string name="notification_channel_name">Agent Service</string>
+    <string name="notification_channel_description">Keeps the ledit agent running</string>
+    <string name="notification_title">Ledit Agent Running</string>
+    <string name="notification_text_idle">Idle - Ready for tasks</string>
+    <string name="notification_action_stop">Stop</string>
+    <string name="notification_action_open">Open</string>
+    
+    <!-- Exit confirmation -->
+    <string name="exit_confirmation_title">Exit App?</string>
+    <string name="exit_confirmation_message">Are you sure you want to exit?</string>
+    <string name="exit_confirmation_exit">Exit</string>
+    <string name="exit_confirmation_cancel">Cancel</string>
+    
+    <!-- Terminal -->
+    <string name="terminal_loading">Loading terminal...</string>
+    
+    <!-- WebUI -->
+    <string name="webui_error_loading">Error loading WebUI</string>
+    <string name="webui_retry">Retry</string>
+    
+    <!-- Preferences - Display -->
+    <string name="pref_category_display">Display</string>
+    <string name="pref_theme_title">Theme</string>
+    <string name="pref_theme_summary">Choose app theme</string>
+    <string name="pref_font_size_title">Font Size</string>
+    <string name="pref_font_size_summary">Terminal font size</string>
+    <string name="pref_font_family_title">Font Family</string>
+    <string name="pref_font_family_summary">Terminal font family</string>
+    
+    <!-- Preferences - Terminal -->
+    <string name="pref_category_terminal">Terminal</string>
+    <string name="pref_shell_path_title">Shell Path</string>
+    <string name="pref_shell_path_summary">Path to shell executable</string>
+    <string name="pref_scrollback_title">Scrollback Lines</string>
+    <string name="pref_scrollback_summary">Number of scrollback lines</string>
+    <string name="pref_keep_screen_on_title">Keep Screen On</string>
+    <string name="pref_keep_screen_on_summary">Prevent screen from turning off</string>
+    <string name="pref_vibrate_title">Vibrate on Keypress</string>
+    <string name="pref_vibrate_summary">Vibrate when keys are pressed</string>
+    
+    <!-- Preferences - WebUI -->
+    <string name="pref_category_webui">WebUI</string>
+    <string name="pref_webui_url_title">WebUI URL</string>
+    <string name="pref_webui_url_summary">URL for WebUI server</string>
+    
+    <!-- Preferences - Service -->
+    <string name="pref_category_service">Background Service</string>
+    <string name="pref_background_service_title">Enable Background Service</string>
+    <string name="pref_background_service_summary">Run ledit agent in background</string>
+    
+    <!-- Array entries -->
+    <string-array name="theme_entries">
+        <item>System Default</item>
+        <item>Light</item>
+        <item>Dark</item>
+    </string-array>
+    <string-array name="theme_values">
+        <item>system</item>
+        <item>light</item>
+        <item>dark</item>
+    </string-array>
+    <string-array name="font_family_entries">
+        <item>Monospace</item>
+        <item>Sans Serif</item>
+        <item>Serif</item>
+    </string-array>
+    <string-array name="font_family_values">
+        <item>monospace</item>
+        <item>sans-serif</item>
+        <item>serif</item>
+    </string-array>
+</resources>

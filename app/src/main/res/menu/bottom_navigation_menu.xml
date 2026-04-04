@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_terminal"
+        android:icon="@drawable/ic_terminal"
+        android:title="@string/nav_terminal"
+        android:contentDescription="@string/nav_terminal" />
+    <item
+        android:id="@+id/nav_webui"
+        android:icon="@drawable/ic_webui"
+        android:title="@string/nav_webui"
+        android:contentDescription="@string/nav_webui" />
+    <item
+        android:id="@+id/nav_settings"
+        android:icon="@drawable/ic_settings"
+        android:title="@string/nav_settings"
+        android:contentDescription="@string/nav_settings" />
+</menu>

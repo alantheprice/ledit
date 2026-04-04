@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory android:title="@string/pref_category_display">
+
+        <ListPreference
+            android:key="theme"
+            android:title="@string/pref_theme_title"
+            android:summary="@string/pref_theme_summary"
+            android:entries="@array/theme_entries"
+            android:entryValues="@array/theme_values"
+            android:defaultValue="system"
+            app:useSimpleSummaryProvider="true" />
+
+        <SeekBarPreference
+            android:key="font_size"
+            android:title="@string/pref_font_size_title"
+            android:summary="@string/pref_font_size_summary"
+            android:defaultValue="12"
+            android:min="8"
+            android:max="24"
+            app:showSeekBarValue="true"
+            app:useSimpleSummaryProvider="true" />
+
+        <ListPreference
+            android:key="font_family"
+            android:title="@string/pref_font_family_title"
+            android:summary="@string/pref_font_family_summary"
+            android:entries="@array/font_family_entries"
+            android:entryValues="@array/font_family_values"
+            android:defaultValue="monospace"
+            app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/pref_category_terminal">
+
+        <ListPreference
+            android:key="shell_path"
+            android:title="@string/pref_shell_path_title"
+            android:summary="@string/pref_shell_path_summary"
+            android:defaultValue="/system/bin/sh"
+            app:useSimpleSummaryProvider="true" />
+
+        <SeekBarPreference
+            android:key="scrollback_lines"
+            android:title="@string/pref_scrollback_title"
+            android:summary="@string/pref_scrollback_summary"
+            android:defaultValue="10000"
+            android:min="1000"
+            android:max="50000"
+            app:showSeekBarValue="true"
+            app:useSimpleSummaryProvider="true" />
+
+        <SwitchPreferenceCompat
+            android:key="keep_screen_on"
+            android:title="@string/pref_keep_screen_on_title"
+            android:summary="@string/pref_keep_screen_on_summary"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
+            android:key="vibrate_on_keypress"
+            android:title="@string/pref_vibrate_title"
+            android:summary="@string/pref_vibrate_summary"
+            android:defaultValue="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/pref_category_webui">
+
+        <EditTextPreference
+            android:key="webui_url"
+            android:title="@string/pref_webui_url_title"
+            android:summary="@string/pref_webui_url_summary"
+            android:defaultValue="http://localhost:54000"
+            app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/pref_category_service">
+
+        <SwitchPreferenceCompat
+            android:key="background_service"
+            android:title="@string/pref_background_service_title"
+            android:summary="@string/pref_background_service_summary"
+            android:defaultValue="true" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>
