@@ -44,22 +44,14 @@ dependencies {
 
 **Problem**: 
 - JNI C code exists (`term_exec.c`)
-- But NDK build never run
+- NDK configuration added to `build.gradle`
+- But ndk-build has NOT been run yet
 - No `.so` file created
 
 **What's needed**:
 - Run `ndk-build` in `app/src/main/jni/`
-- Copy `.so` to proper location
-- Load library in PTYSession
-
-**Action**: Add to `app/build.gradle`:
-```gradle
-sourceSets {
-    main {
-        jniLibs.srcDirs = ['libs']
-    }
-}
-```
+- Copy `.so` to `app/libs/{abi}/`
+- Already configured in build.gradle via externalNativeBuild
 
 ---
 
@@ -196,6 +188,22 @@ When building on a proper machine, verify:
 - [ ] `./gradlew assembleDebug` completes
 - [ ] APK contains `.so` files
 - [ ] APK installs on device
+
+---
+
+## Session Progress (2026-04-04)
+
+### Completed This Session:
+1. ✅ **Terminal PTY wiring verified** - TerminalFragment properly connects PTYSession to TerminalView (was already done)
+2. ✅ **HTTP Server implemented** - LedisService has full NanoHttpd implementation with asset serving, API endpoints, path validation
+3. ✅ **Build configuration updated** - Added NDK config, AAR dependency, ProGuard rules
+4. ✅ **Fragment navigation reviewed** - MainActivity uses FragmentContainerView correctly
+5. ✅ **Gap analysis created** - Comprehensive GAP_ANALYSIS.md documenting remaining work
+
+### Remaining Gaps:
+- **Go AAR not built** - Need to run gomobile bind
+- **Native .so not built** - Need to run ndk-build  
+- **Agent integration** - Service has placeholder, needs Go agent call
 
 ---
 
