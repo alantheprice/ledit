@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -260,6 +261,13 @@ func (ws *ReactWebServer) handleAPISSHOpen(w http.ResponseWriter, r *http.Reques
 		writeSSHJSONError(w, http.StatusBadRequest, payload)
 		return
 	}
+
+	// Record SSH workspace usage for recent-workspace history (fire-and-forget).
+	go func() {
+		if herr := recordSSHWorkspaceUsage(req.HostAlias, req.RemoteWorkspacePath); herr != nil {
+			log.Printf("[web] record ssh workspace history: %v", herr)
+		}
+	}()
 
 	w.Header().Set("Content-Type", "application/json")
 	proxyPath := result.ProxyBase + "/"

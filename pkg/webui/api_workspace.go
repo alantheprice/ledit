@@ -3,6 +3,7 @@ package webui
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -123,6 +124,13 @@ func (ws *ReactWebServer) handleAPIWorkspaceSet(w http.ResponseWriter, r *http.R
 		http.Error(w, fmt.Sprintf("Failed to set workspace: %v", err), http.StatusBadRequest)
 		return
 	}
+
+	// Record workspace path for recent-workspace history (fire-and-forget).
+	go func() {
+		if herr := recordWorkspacePath(workspaceRoot); herr != nil {
+			log.Printf("[web] record workspace history: %v", herr)
+		}
+	}()
 
 	ws.publishClientEvent(clientID, events.EventTypeWorkspaceChanged, map[string]interface{}{
 		"daemon_root":             ws.GetDaemonRoot(),

@@ -208,6 +208,29 @@ export interface WorkspaceResponse {
   };
 }
 
+export interface WorkspaceHistoryEntry {
+  path: string;
+  type: 'local' | 'ssh';
+  host_alias?: string;
+  remote_path?: string;
+  last_used: string;
+  use_count: number;
+}
+
+export interface WorkspaceBrowseResponse {
+  message: string;
+  path: string;
+  daemon_root: string;
+  workspace_root: string;
+  files: Array<{
+    name: string;
+    path: string;
+    type: string;
+    size?: number;
+    modified?: number;
+  }>;
+}
+
 class ApiService {
   private static readonly SSH_OPEN_TIMEOUT_MS = 90_000;
 
@@ -303,6 +326,36 @@ class ApiService {
       ...workspace,
       message: data.message || 'Workspace updated',
     };
+  }
+
+  async getWorkspaceHistory(): Promise<{
+    message: string;
+    entries: WorkspaceHistoryEntry[];
+  }> {
+    try {
+      const response = await clientFetch('/api/workspace/history');
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to get workspace history:', error);
+      throw error;
+    }
+  }
+
+  async browseWorkspace(path?: string): Promise<WorkspaceBrowseResponse> {
+    const params = new URLSearchParams();
+    if (path) params.set('path', path);
+    const url = `/api/workspace/browse${params.toString() ? '?' + params.toString() : ''}`;
+    const response = await clientFetch(url);
+    const text = await response.text();
+    let data: any = {};
+    if (text) {
+      try { data = JSON.parse(text); } catch { data = { message: text }; }
+    }
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Failed to browse workspace');
+    }
+    return data as WorkspaceBrowseResponse;
   }
 
   async getTerminalSessionCount(): Promise<number> {

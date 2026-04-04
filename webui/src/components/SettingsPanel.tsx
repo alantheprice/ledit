@@ -6,6 +6,8 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
+import ZoomControls from './ZoomControls';
+import { useUiZoom } from '../hooks/useUiZoom';
 
 /* ─── Types ──────────────────────────────────────────────────── */
 
@@ -113,6 +115,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
   const [subagentSavingPersona, setSubagentSavingPersona] = useState<string | null>(null);
 
   const api = ApiService.getInstance();
+  const { zoomLevel, zoomIn, zoomOut, resetZoom, setZoomLevel } = useUiZoom();
   const toastTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const textSaveTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -612,6 +615,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
               12,
               'Applies to the main agent. Leave blank to use the built-in default prompt.',
             )}
+            <div style={{ marginTop: 'var(--space-5)' }}>
+              <h4>Appearance</h4>
+              <ZoomControls
+                zoomLevel={zoomLevel}
+                onZoomIn={zoomIn}
+                onZoomOut={zoomOut}
+                onReset={resetZoom}
+                onZoomChange={setZoomLevel}
+              />
+            </div>
           </div>
         );
 

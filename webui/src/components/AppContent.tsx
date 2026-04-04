@@ -12,6 +12,7 @@ import CommandPalette from './CommandPalette';
 import { useEditorManager } from '../contexts/EditorManagerContext';
 import { ApiService, LeditInstance } from '../services/api';
 import { useGitWorkspace } from '../hooks/useGitWorkspace';
+import { useUiZoom } from '../hooks/useUiZoom';
 import type { ChatSession } from '../services/chatSessions';
 
 const INSTANCE_PID_STORAGE_KEY = 'ledit:webui:instancePid';
@@ -216,6 +217,7 @@ const AppContent: React.FC<AppContentProps> = ({
     saveAllBuffers,
   } = useEditorManager();
   const apiService = ApiService.getInstance();
+  const { zoomIn, zoomOut, resetZoom } = useUiZoom();
 
   // Compute current todos: prefer state from todo_update events, fall back to parsing from TodoWrite tool executions
   const currentTodos = useMemo(() => {
@@ -1292,6 +1294,9 @@ const AppContent: React.FC<AppContentProps> = ({
         onToggleSidebar={onSidebarToggle}
         onToggleTerminal={() => onTerminalExpandedChange(!isTerminalExpanded)}
         onOpenHotkeysConfig={handleOpenHotkeysConfig}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onZoomReset={resetZoom}
       />
     </div>
   );

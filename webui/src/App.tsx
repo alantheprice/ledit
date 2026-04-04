@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import ErrorBoundary from './components/ErrorBoundary';
 import AppContent from './components/AppContent';
 import UIManager from './components/UIManager';
+import WorkspacePickerModal from './components/WorkspacePickerModal';
 import { EditorManagerProvider } from './contexts/EditorManagerContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { HotkeyProvider } from './contexts/HotkeyContext';
@@ -416,6 +417,10 @@ function App() {
     platformActionMessage: null,
     error: null,
   });
+
+  // Workspace picker state: shown on fresh tabs (no persisted state).
+  const [showWorkspacePicker, setShowWorkspacePicker] = useState(false);
+  const pickerConsideredRef = useRef(false); // prevent re-showing once decided
 
   // Wire up browser tab freeze/resume for WebSocket connections.
   // When Chrome throttles a background tab, WebSocket connections become stale.
@@ -1348,6 +1353,54 @@ function App() {
     refreshOnboardingStatus().catch(() => {});
   }, [refreshOnboardingStatus]);
 
+  // ── Workspace picker startup check ──────────────────────────────
+  // Show the workspace picker on truly fresh tabs where:
+  //   1. No persisted chat state was loaded (messages empty at mount time)
+  //   2. sessionStorage doesn't have a "dismissed" flag for this tab
+  //   3. Onboarding is NOT active (provider setup comes first)
+  //   4. Not already behind an SSH proxy (workspace already chosen remotely)
+  //
+  // Depends on `onboarding.checking` so the decision fires once the API
+  // response is in — no fragile setTimeout or DOM queries.
+  useEffect(() => {
+    if (pickerConsideredRef.current) return;
+
+    const sshProxy = typeof window !== 'undefined' && (window as any).LEDIT_PROXY_BASE;
+    if (sshProxy) {
+      // Already on an SSH proxied session — workspace was chosen when this
+      // proxy session was created; don't show the picker.
+      pickerConsideredRef.current = true;
+      return;
+    }
+
+    // Still waiting for the onboarding API call — don't decide yet.
+    if (onboarding.checking) return;
+
+    // Onboarding check is done; lock in the decision so we never re-evaluate.
+    pickerConsideredRef.current = true;
+
+    // If onboarding is needed, skip the picker — provider setup comes first.
+    if (onboarding.open) return;
+
+    // If the user already dismissed the picker in this tab session, skip.
+    try {
+      if (window.sessionStorage.getItem('ledit.workspacePickerDismissed') === '1') return;
+    } catch { /* ignore */ }
+
+    // If there are persisted messages, the user has an existing session — skip.
+    const storageKey = getAppStateStorageKey();
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.messages) && parsed.messages.length > 0) return;
+      }
+    } catch { /* ignore */ }
+
+    // Fresh tab with no prior state — show the picker.
+    setShowWorkspacePicker(true);
+  }, [onboarding.checking, onboarding.open]);
+
   useEffect(() => {
     // Register Service Worker for PWA functionality
     registerServiceWorker();
@@ -1698,6 +1751,40 @@ function App() {
     }));
   }, []);
 
+  // ── Workspace picker handlers ───────────────────────────────────
+  const handleWorkspaceSelected = useCallback(async (path: string) => {
+    try {
+      await apiService.setWorkspace(path);
+    } catch {
+      // setWorkspace may fail if path is invalid; continue anyway
+    }
+    setShowWorkspacePicker(false);
+    try { window.sessionStorage.setItem('ledit.workspacePickerDismissed', '1'); } catch { /* ignore */ }
+  }, [apiService]);
+
+  const handleSSHSelected = useCallback(async (hostAlias: string, remotePath: string) => {
+    setShowWorkspacePicker(false);
+    try { window.sessionStorage.setItem('ledit.workspacePickerDismissed', '1'); } catch { /* ignore */ }
+    try {
+      const result = await apiService.openSSHWorkspace(hostAlias, remotePath);
+      // Navigate to the proxy URL so the app loads on the remote workspace.
+      if (result.proxy_url) {
+        window.location.href = result.proxy_url;
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to open SSH workspace';
+      setState(prev => ({ ...prev, lastError: msg }));
+      // Re-show the picker so the user can try again
+      setShowWorkspacePicker(true);
+      try { window.sessionStorage.removeItem('ledit.workspacePickerDismissed'); } catch { /* ignore */ }
+    }
+  }, [apiService]);
+
+  const handlePickerDismissed = useCallback(() => {
+    setShowWorkspacePicker(false);
+    try { window.sessionStorage.setItem('ledit.workspacePickerDismissed', '1'); } catch { /* ignore */ }
+  }, []);
+
   const handleGitCommit = useCallback(async (message: string, files: string[]) => {
     debugLog('Git commit:', message, files);
     try {
@@ -1851,6 +1938,13 @@ function App() {
                 onRenameChat={handleRenameChat}
                 perChatCache={state.perChatCache}
               />
+              {showWorkspacePicker && !onboarding.open && (
+                <WorkspacePickerModal
+                  onWorkspaceSelected={handleWorkspaceSelected}
+                  onSSHSelected={handleSSHSelected}
+                  onDismissed={handlePickerDismissed}
+                />
+              )}
               {onboarding.open && (
                 <div className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Set up ledit">
                   <div className="onboarding-card">

@@ -12,6 +12,9 @@ interface CommandPaletteProps {
   onToggleSidebar: () => void;
   onToggleTerminal: () => void;
   onOpenHotkeysConfig: () => void;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onZoomReset?: () => void;
 }
 
 interface FileResult {
@@ -49,6 +52,9 @@ const COMMAND_DEFINITIONS: CommandDef[] = [
   { id: 'split_terminal_horizontal', label: 'Split Terminal Horizontal', category: 'View' },
   { id: 'editor_toggle_word_wrap', label: 'Toggle Word Wrap', category: 'View' },
   { id: 'toggle_minimap', label: 'Toggle Minimap', category: 'View' },
+  { id: 'zoom_in', label: 'Zoom In', category: 'View' },
+  { id: 'zoom_out', label: 'Zoom Out', category: 'View' },
+  { id: 'zoom_reset', label: 'Reset Zoom', category: 'View' },
   { id: 'toggle_linked_scroll', label: 'Toggle Linked Scrolling', category: 'View' },
   // Navigation
   { id: 'focus_next_tab', label: 'Focus Next Tab', category: 'Navigation' },
@@ -98,6 +104,9 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
   onToggleSidebar,
   onToggleTerminal,
   onOpenHotkeysConfig,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
 }) => {
   const { hotkeyForCommand } = useHotkeys();
 
@@ -370,11 +379,20 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
       case 'focus_prev_tab':
         window.dispatchEvent(new CustomEvent('ledit:hotkey', { detail: { commandId: 'focus_prev_tab' } }));
         break;
+      case 'zoom_in':
+        onZoomIn?.();
+        break;
+      case 'zoom_out':
+        onZoomOut?.();
+        break;
+      case 'zoom_reset':
+        onZoomReset?.();
+        break;
       default:
         break;
     }
     onClose();
-  }, [onClose, onToggleSidebar, onToggleTerminal, onOpenHotkeysConfig]);
+  }, [onClose, onToggleSidebar, onToggleTerminal, onOpenHotkeysConfig, onZoomIn, onZoomOut, onZoomReset]);
 
   // ── Select & execute the currently selected item ──────────────────────
 
