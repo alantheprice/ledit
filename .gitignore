@@ -127,3 +127,12 @@ e2e_tests/test_results_analysis.txt
 # Temporary/example files
 hello.py
 go_modules_best_practices.md
+
+# Android development
+.gradle/
+android-app-impl/
+gradle.properties
+local.properties
+
+# Unrelated utility packages
+pkg/utils/
