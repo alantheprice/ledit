@@ -1,6 +1,6 @@
 {
-  "updated_at": "2026-03-27T12:00:00Z",
-  "source": "repo",
+  "updated_at": "2026-04-04T09:30:23Z",
+  "source": "refresh_provider_catalog",
   "providers": [
     {
       "id": "zai",
@@ -17,18 +17,73 @@
       "recommended_model_why": "Current flagship GLM coding model with strong tool and agent support.",
       "models": [
         {
-          "id": "glm-5",
-          "name": "GLM-5",
-          "description": "Flagship coding model",
-          "context_length": 200000,
-          "tags": ["coding", "tools"]
+          "id": "GLM-4.5",
+          "name": "GLM-4.5",
+          "description": "Z.AI GLM-4.5 - Previous generation with 128K context window",
+          "context_length": 128000,
+          "tags": [
+            "tools"
+          ]
+        },
+        {
+          "id": "GLM-4.5-air",
+          "name": "GLM-4.5 Air",
+          "description": "Z.AI GLM-4.5 Air - Lightweight version with 128K context window",
+          "context_length": 128000,
+          "tags": [
+            "tools"
+          ]
         },
         {
           "id": "GLM-4.6",
           "name": "GLM-4.6",
-          "description": "Coding-optimized GLM model",
+          "description": "Z.AI GLM-4.6 - Coding optimized model with 200K context window",
           "context_length": 200000,
-          "tags": ["coding", "tools"]
+          "tags": [
+            "tools",
+            "coding"
+          ]
+        },
+        {
+          "id": "glm-4.6v",
+          "name": "GLM-4.6 Vision",
+          "description": "Z.AI GLM-4.6 with vision capabilities",
+          "context_length": 200000,
+          "tags": [
+            "tools",
+            "coding",
+            "vision"
+          ]
+        },
+        {
+          "id": "glm-4.7",
+          "name": "GLM-4.7",
+          "description": "Z.AI GLM-4.7 - Latest GLM-4.x model with 200K context window",
+          "context_length": 200000,
+          "tags": [
+            "tools",
+            "coding"
+          ]
+        },
+        {
+          "id": "glm-5",
+          "name": "GLM-5",
+          "description": "Z.AI GLM-5 - Flagship model with 200K context, 128K max output, agentic coding",
+          "context_length": 200000,
+          "tags": [
+            "tools",
+            "coding"
+          ]
+        },
+        {
+          "id": "glm-5-turbo",
+          "name": "GLM-5 Turbo",
+          "description": "Z.AI GLM-5-Turbo - Optimized for agent/tool tasks with 200K context, 128K max output",
+          "context_length": 200000,
+          "tags": [
+            "tools",
+            "coding"
+          ]
         }
       ]
     },
@@ -50,13 +105,19 @@
           "id": "MiniMax-M2.5",
           "name": "MiniMax M2.5",
           "context_length": 204800,
-          "tags": ["coding", "tools"]
+          "tags": [
+            "coding",
+            "tools"
+          ]
         },
         {
           "id": "MiniMax-VL-01",
           "name": "MiniMax VL-01",
           "context_length": 204800,
-          "tags": ["vision", "tools"]
+          "tags": [
+            "vision",
+            "tools"
+          ]
         }
       ]
     },
@@ -72,8 +133,7 @@
       "recommended": true,
       "default_model": "qwen/qwen3-coder-30b",
       "recommended_model": "qwen/qwen3-coder-30b",
-      "recommended_model_why": "Prefer a coding-focused model over generic defaults.",
-      "models": []
+      "recommended_model_why": "Prefer a coding-focused model over generic defaults."
     },
     {
       "id": "deepinfra",
@@ -87,8 +147,7 @@
       "recommended": true,
       "default_model": "deepseek-ai/DeepSeek-V3.1-Terminus",
       "recommended_model": "deepseek-ai/DeepSeek-V3.1-Terminus",
-      "recommended_model_why": "Good default for coding-oriented open-model inference.",
-      "models": []
+      "recommended_model_why": "Good default for coding-oriented open-model inference."
     },
     {
       "id": "chutes",
@@ -108,13 +167,19 @@
           "id": "deepseek-ai/DeepSeek-R1-0528",
           "name": "DeepSeek R1 0528",
           "context_length": 64000,
-          "tags": ["coding", "reasoning"]
+          "tags": [
+            "coding",
+            "reasoning"
+          ]
         },
         {
           "id": "deepseek-ai/DeepSeek-V3",
           "name": "DeepSeek V3",
           "context_length": 64000,
-          "tags": ["coding", "tools"]
+          "tags": [
+            "coding",
+            "tools"
+          ]
         }
       ]
     },
@@ -127,11 +192,9 @@
       "signup_url": "https://platform.openai.com/api-keys",
       "api_key_label": "OpenAI API Key",
       "api_key_help": "Only configure this if you explicitly want it.",
-      "recommended": false,
       "default_model": "gpt-5-mini",
       "recommended_model": "gpt-5-mini",
-      "recommended_model_why": "Fallback provider entry only.",
-      "models": []
+      "recommended_model_why": "Fallback provider entry only."
     }
   ]
 }
