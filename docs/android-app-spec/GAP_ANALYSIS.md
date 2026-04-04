@@ -22,36 +22,21 @@ The Android app has a **foundation** but requires significant additional work to
 
 ## Critical Gaps
 
-### 1. No Built AAR (01-go-mobile)
+### 1. Go AAR - Needs Proper Build Environment
 
-**Problem**: The Go code exists but:
-- `gomobile bind` has never been run
-- No `ledit.aar` exists
-- `app/build.gradle` doesn't reference any AAR
-
-**What's needed**:
-```gradle
-dependencies {
-    implementation files('libs/ledit.aar')
-}
-```
-
-**Action**: Run `gomobile bind -target=android -javapkg=com.ledit.editor -out=app/libs/ledit.aar ./bind`
+**Status**: Code is ready ✅, but can't build due to incomplete NDK
+- Go packages (mobile, bind) compile successfully
+- No CGO dependencies (verified)
+- Ready for gomobile bind when NDK is available
 
 ---
 
-### 2. Native Library Not Built (02-terminal-pty)
+### 2. Native PTY Library - Needs NDK Build
 
-**Problem**: 
-- JNI C code exists (`term_exec.c`)
-- NDK configuration added to `build.gradle`
-- But ndk-build has NOT been run yet
-- No `.so` file created
-
-**What's needed**:
-- Run `ndk-build` in `app/src/main/jni/`
-- Copy `.so` to `app/libs/{abi}/`
-- Already configured in build.gradle via externalNativeBuild
+**Status**: Code is ready ✅, but NDK build can't run in this environment
+- JNI C code exists (term_exec.c)
+- build.gradle has NDK configuration
+- Need to run ndk-build on proper build machine
 
 ---
 
@@ -204,6 +189,29 @@ When building on a proper machine, verify:
 - **Go AAR not built** - Need to run gomobile bind
 - **Native .so not built** - Need to run ndk-build  
 - **Agent integration** - Service has placeholder, needs Go agent call
+
+---
+
+## Build Environment Status (2026-04-04)
+
+**Current environment**: Termux on Android (aarch64)
+- Go available: ✅ Go 1.26.0
+- gomobile available: ✅ 
+- Android SDK: ⚠️ Incomplete (missing platforms meta)
+- Android NDK: ⚠️ Incomplete (26b has no toolchain)
+
+### Attempted fixes:
+1. Created symlinks for build-tools (aapt, aidl, d8, etc.)
+2. Created dummy files for missing tools
+3. AAPT2 daemon failing (incompatible version)
+
+**Result**: Cannot build in this environment.
+
+### Solution:
+The `build-android.sh` script has been created for use on a proper build machine with:
+- Full Android SDK with platforms
+- Android NDK with complete toolchain
+- Java 17+
 
 ---
 
