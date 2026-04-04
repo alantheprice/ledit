@@ -20,7 +20,7 @@ Compile Go ledit code to an Android library using gomobile.
 
 | Status | Todo Item | Completion Criteria |
 |--------|-----------|---------------------|
-| pending | Run `gomobile init` | Initializes Android SDK bindings |
+| completed | Run `gomobile init` | Initializes Android SDK bindings |
 | completed | Prepare ledit code | Remove unsupported packages (e.g., os/exec, net/http for some features) |
 | completed | Create gomobile.toml | Define target Android API level, package name |
 
