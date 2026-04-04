@@ -1,192 +1,163 @@
 package com.ledit.android.util
 
 import android.content.Context
-import android.util.Log
-import java.io.File
-import java.io.FileOutputStream
-import java.io.InputStream
 
 /**
- * ShellBundle - Utility for managing bundled shell tools (toybox) in the APK.
- * 
- * This class handles:
+ * ShellBundle - High-level utility for managing bundled shell tools (toybox) in the APK.
+ *
+ * This class provides a convenient wrapper around [ShellBundleManager] for common use cases.
+ * It handles:
  * - Extracting toybox binary from assets to app's private directory
  * - Setting executable permissions
  * - Providing paths to bundled commands
+ * - Executing shell commands
+ *
+ * ## Usage
+ *
+ * Initialize at app startup:
+ * ```
+ * ShellBundle.initialize(context)
+ * ```
+ *
+ * Execute commands:
+ * ```
+ * val result = ShellBundle.execute(context, "ls", "-la")
+ * if (result.isSuccess) {
+ *     println(result.stdout)
+ * }
+ * ```
+ *
+ * Get the shell to use for terminal sessions:
+ * ```
+ * val shell = ShellBundle.getShell(context)
+ * ```
+ *
+ * @see ShellBundleManager
  */
 object ShellBundle {
 
-    private const val TAG = "ShellBundle"
-    
-    // Binary filename in assets
-    private const val TOYBOX_ASSET = "toybox"
-    
-    // Directory for extracted binaries
-    private const val BIN_DIR = "bin"
-    
-    // Cached binary path
-    private var binaryPath: String? = null
-    
     /**
      * Initialize the shell bundle - extract binary if needed
+     * @return true if initialization succeeded
      */
     fun initialize(context: Context): Boolean {
-        if (binaryPath != null && File(binaryPath!!).exists()) {
-            return true // Already initialized
-        }
-        
-        return try {
-            extractBinary(context)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize shell bundle", e)
-            false
-        }
+        return ShellBundleManager.initialize(context)
     }
-    
+
     /**
-     * Extract toybox binary from assets to private directory
+     * Initialize with download fallback if assets not available
+     * @param context Application context
+     * @param forceDownload If true, skip assets and download directly
+     * @return true if initialization succeeded
      */
-    private fun extractBinary(context: Context): Boolean {
-        val binDir = File(context.filesDir, BIN_DIR)
-        if (!binDir.exists()) {
-            binDir.mkdirs()
-        }
-        
-        val binaryFile = File(binDir, TOYBOX_ASSET)
-        
-        // Check if already extracted
-        if (binaryFile.exists()) {
-            binaryPath = binaryFile.absolutePath
-            return setExecutable(binaryFile)
-        }
-        
-        // Try to extract from assets
-        return try {
-            val assets = context.assets
-            val inputStream: InputStream = try {
-                assets.open("$TOYBOX_ASSET")
-            } catch (e: Exception) {
-                Log.w(TAG, "No toybox binary in assets, using system shell")
-                return false
-            }
-            
-            inputStream.use { input ->
-                FileOutputStream(binaryFile).use { output ->
-                    input.copyTo(output)
-                }
-            }
-            
-            binaryPath = binaryFile.absolutePath
-            setExecutable(binaryFile)
-            
-            Log.d(TAG, "Extracted toybox to: $binaryPath")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to extract toybox", e)
-            false
-        }
+    fun initializeWithFallback(context: Context, forceDownload: Boolean = false): Boolean {
+        return ShellBundleManager.initializeWithFallback(context, forceDownload)
     }
-    
-    /**
-     * Set executable permission on the binary
-     */
-    private fun setExecutable(path: String): Boolean {
-        return try {
-            val file = File(path)
-            val success = file.setExecutable(true)
-            if (success) {
-                Log.d(TAG, "Set executable: $path")
-            } else {
-                Log.w(TAG, "Failed to set executable: $path")
-            }
-            success
-        } catch (e: Exception) {
-            Log.e(TAG, "Error setting executable", e)
-            false
-        }
-    }
-    
+
     /**
      * Get the path to the toybox binary
+     * @return Absolute path or null if not available
      */
-    fun getBinaryPath(): String? = binaryPath
-    
+    fun getBinaryPath(): String? = ShellBundleManager.getBinaryPath()
+
     /**
      * Check if toybox is available
+     * @return true if shell bundle is available and working
      */
-    fun isAvailable(): Boolean {
-        return binaryPath != null && File(binaryPath!!).exists()
-    }
-    
+    fun isAvailable(): Boolean = ShellBundleManager.isAvailable()
+
     /**
      * Execute a command using the bundled shell
-     * @return Pair of (exitCode, output)
+     * @param context Application context
+     * @param command Command string to execute
+     * @return ExecutionResult with exit code, stdout, and stderr
      */
-    fun execute(context: Context, command: String): Pair<Int, String> {
-        if (!initialize(context)) {
-            return Pair(-1, "Shell bundle not available")
-        }
-        
-        val binary = binaryPath ?: return Pair(-1, "No binary")
-        
-        return try {
-            val process = ProcessBuilder(binary, command)
-                .redirectErrorStream(true)
-                .start()
-            
-            val output = process.inputStream.bufferedReader().readText()
-            val exitCode = process.waitFor()
-            
-            Pair(exitCode, output)
-        } catch (e: Exception) {
-            Pair(-1, "Execution failed: ${e.message}")
-        }
+    fun execute(context: Context, command: String): ExecutionResult {
+        return ShellBundleManager.execute(context, command)
     }
-    
+
     /**
      * Execute a command with arguments
+     * @param context Application context
+     * @param args Command arguments
+     * @return ExecutionResult with exit code, stdout, and stderr
      */
-    fun execute(context: Context, vararg args: String): Pair<Int, String> {
-        if (!initialize(context)) {
-            return Pair(-1, "Shell bundle not available")
-        }
-        
-        val binary = binaryPath ?: return Pair(-1, "No binary")
-        
-        return try {
-            val process = ProcessBuilder(binary, *args)
-                .redirectErrorStream(true)
-                .start()
-            
-            val output = process.inputStream.bufferedReader().readText()
-            val exitCode = process.waitFor()
-            
-            Pair(exitCode, output)
-        } catch (e: Exception) {
-            Pair(-1, "Execution failed: ${e.message}")
-        }
+    fun execute(context: Context, vararg args: String): ExecutionResult {
+        return ShellBundleManager.execute(context, *args)
     }
-    
+
+    /**
+     * Execute a command with stdin input
+     * @param context Application context
+     * @param stdin Input to provide to stdin (can be null)
+     * @param args Command arguments
+     * @return ExecutionResult with exit code, stdout, and stderr
+     */
+    fun executeWithStdin(context: Context, stdin: String?, vararg args: String): ExecutionResult {
+        return ShellBundleManager.executeWithStdin(context, stdin, *args)
+    }
+
+    /**
+     * Create an interactive process for streaming I/O
+     * @param context Application context
+     * @param args Command arguments
+     * @return ProcessHandle for interacting with the process, or null if failed
+     */
+    fun createInteractiveProcess(context: Context, vararg args: String): ProcessHandle? {
+        return ShellBundleManager.createInteractiveProcess(context, *args)
+    }
+
     /**
      * List available commands in toybox
+     * @param context Application context
+     * @return List of command names
      */
     fun listCommands(context: Context): List<String> {
-        val result = execute(context, "--list")
-        if (result.first == 0) {
-            return result.second.lines().map { it.trim() }.filter { it.isNotEmpty() }
-        }
-        return emptyList()
+        return ShellBundleManager.listCommands(context)
     }
-    
+
     /**
-     * Get the shell to use for terminal
+     * Check if a specific command is available
+     * @param context Application context
+     * @param command Command name to check
+     * @return true if command is available
+     */
+    fun hasCommand(context: Context, command: String): Boolean {
+        return ShellBundleManager.hasCommand(context, command)
+    }
+
+    /**
+     * Get the version of toybox
+     * @param context Application context
+     * @return Version string or null if not available
+     */
+    fun getVersion(context: Context): String? {
+        return ShellBundleManager.getVersion(context)
+    }
+
+    /**
+     * Get the shell to use for terminal sessions
      * Returns either bundled toybox or system shell
+     * @param context Application context
+     * @return Path to shell executable
      */
     fun getShell(context: Context): String {
-        return if (isAvailable()) {
-            binaryPath!!
-        } else {
-            "/system/bin/sh"
-        }
+        return ShellBundleManager.getShellCommand(context)
+    }
+
+    /**
+     * Set custom download URL for shell bundle
+     * @param url Base URL for downloading toybox binaries
+     */
+    fun setDownloadUrl(url: String) {
+        ShellBundleManager.setDownloadUrl(url)
+    }
+
+    /**
+     * Get the target architecture for the current device
+     * @return Architecture string (arm64, arm, x86_64, x86)
+     */
+    fun getTargetArchitecture(): String {
+        return ShellBundleManager.getTargetArchitecture()
     }
 }

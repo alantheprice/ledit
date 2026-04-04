@@ -7,6 +7,7 @@
     <string name="nav_terminal">Terminal</string>
     <string name="nav_webui">WebUI</string>
     <string name="nav_settings">Settings</string>
+    <string name="nav_bottom_navigation">Navigation</string>
     
     <!-- Notification strings -->
     <string name="notification_channel_name">Agent Service</string>
@@ -24,6 +25,11 @@
     
     <!-- Terminal -->
     <string name="terminal_loading">Loading terminal...</string>
+    <string name="pty_init_failed">Failed to initialize PTY</string>
+    <string name="shell_start_failed">Failed to start shell</string>
+    <string name="pty_init_error">PTY initialization error: %1$s</string>
+    <string name="shell_started">Shell started (PID: %1$d)</string>
+    <string name="shell_exited">Shell exited with code: %1$d</string>
     
     <!-- WebUI -->
     <string name="webui_error_loading">Error loading WebUI</string>
