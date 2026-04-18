@@ -1,155 +1,200 @@
 {
+  "updated_at": "2026-04-18T09:34:43Z",
+  "source": "refresh_provider_catalog",
   "providers": [
     {
-      "api_key_help": "Z.AI Coding Plan users may need to use the dedicated coding API base instead of the general API.",
-      "api_key_label": "Z.AI API Key",
-      "default_model": "glm-5",
-      "description": "Coding-focused provider with dedicated coding-plan support and strong GLM model coverage.",
-      "docs_url": "https://docs.z.ai/devpack/overview",
       "id": "zai",
-      "models": [
-        {
-          "context_length": 200000,
-          "description": "Flagship coding model",
-          "id": "glm-5",
-          "name": "GLM-5",
-          "tags": [
-            "coding",
-            "tools"
-          ]
-        },
-        {
-          "context_length": 200000,
-          "description": "Coding-optimized GLM model",
-          "id": "GLM-4.6",
-          "name": "GLM-4.6",
-          "tags": [
-            "coding",
-            "tools"
-          ]
-        }
-      ],
       "name": "Z.AI",
+      "description": "Coding-focused provider with dedicated coding-plan support and strong GLM model coverage.",
+      "setup_hint": "Create a Z.AI API key, then prefer a current GLM coding model.",
+      "docs_url": "https://docs.z.ai/devpack/overview",
+      "signup_url": "https://platform.z.ai/",
+      "api_key_label": "Z.AI API Key",
+      "api_key_help": "Z.AI Coding Plan users may need to use the dedicated coding API base instead of the general API.",
       "recommended": true,
+      "default_model": "glm-5",
       "recommended_model": "glm-5",
       "recommended_model_why": "Current flagship GLM coding model with strong tool and agent support.",
-      "setup_hint": "Create a Z.AI API key, then prefer a current GLM coding model.",
-      "signup_url": "https://platform.z.ai/"
-    },
-    {
-      "api_key_help": "MiniMax supports both standard API access and coding-plan workflows.",
-      "api_key_label": "MiniMax API Key",
-      "default_model": "MiniMax-M2.5",
-      "description": "Coding-oriented provider with large context windows and dedicated coding-plan options.",
-      "docs_url": "https://platform.minimax.io/docs/api-reference/api-overview",
-      "id": "minimax",
       "models": [
         {
-          "context_length": 204800,
+          "id": "GLM-4.5",
+          "name": "GLM-4.5",
+          "description": "Z.AI GLM-4.5 - Previous generation with 128K context window",
+          "context_length": 128000,
+          "tags": [
+            "tools"
+          ]
+        },
+        {
+          "id": "GLM-4.5-air",
+          "name": "GLM-4.5 Air",
+          "description": "Z.AI GLM-4.5 Air - Lightweight version with 128K context window",
+          "context_length": 128000,
+          "tags": [
+            "tools"
+          ]
+        },
+        {
+          "id": "GLM-4.6",
+          "name": "GLM-4.6",
+          "description": "Z.AI GLM-4.6 - Coding optimized model with 200K context window",
+          "context_length": 200000,
+          "tags": [
+            "tools",
+            "coding"
+          ]
+        },
+        {
+          "id": "glm-4.6v",
+          "name": "GLM-4.6 Vision",
+          "description": "Z.AI GLM-4.6 with vision capabilities",
+          "context_length": 200000,
+          "tags": [
+            "tools",
+            "coding",
+            "vision"
+          ]
+        },
+        {
+          "id": "glm-4.7",
+          "name": "GLM-4.7",
+          "description": "Z.AI GLM-4.7 - Latest GLM-4.x model with 200K context window",
+          "context_length": 200000,
+          "tags": [
+            "tools",
+            "coding"
+          ]
+        },
+        {
+          "id": "glm-5",
+          "name": "GLM-5",
+          "description": "Z.AI GLM-5 - Flagship model with 200K context, 128K max output, agentic coding",
+          "context_length": 200000,
+          "tags": [
+            "tools",
+            "coding"
+          ]
+        },
+        {
+          "id": "glm-5-turbo",
+          "name": "GLM-5 Turbo",
+          "description": "Z.AI GLM-5-Turbo - Optimized for agent/tool tasks with 200K context, 128K max output",
+          "context_length": 200000,
+          "tags": [
+            "tools",
+            "coding"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "minimax",
+      "name": "MiniMax",
+      "description": "Coding-oriented provider with large context windows and dedicated coding-plan options.",
+      "setup_hint": "Start with MiniMax M2.5 if your account exposes it.",
+      "docs_url": "https://platform.minimax.io/docs/api-reference/api-overview",
+      "signup_url": "https://platform.minimax.io/",
+      "api_key_label": "MiniMax API Key",
+      "api_key_help": "MiniMax supports both standard API access and coding-plan workflows.",
+      "recommended": true,
+      "default_model": "MiniMax-M2.5",
+      "recommended_model": "MiniMax-M2.5",
+      "recommended_model_why": "Best current default in this provider family for coding-oriented use.",
+      "models": [
+        {
           "id": "MiniMax-M2.5",
           "name": "MiniMax M2.5",
+          "context_length": 204800,
           "tags": [
             "coding",
             "tools"
           ]
         },
         {
-          "context_length": 204800,
           "id": "MiniMax-VL-01",
           "name": "MiniMax VL-01",
+          "context_length": 204800,
           "tags": [
             "vision",
             "tools"
           ]
         }
-      ],
-      "name": "MiniMax",
-      "recommended": true,
-      "recommended_model": "MiniMax-M2.5",
-      "recommended_model_why": "Best current default in this provider family for coding-oriented use.",
-      "setup_hint": "Start with MiniMax M2.5 if your account exposes it.",
-      "signup_url": "https://platform.minimax.io/"
+      ]
     },
     {
-      "api_key_help": "Choose a coding-capable model after connecting your key.",
-      "api_key_label": "OpenRouter API Key",
-      "default_model": "qwen/qwen3.5-27b",
-      "description": "Unified gateway with many model families and a stable OpenAI-compatible API.",
-      "docs_url": "https://openrouter.ai/",
       "id": "openrouter",
-      "models": [],
       "name": "OpenRouter",
-      "recommended": true,
-      "recommended_model": "qwen/qwen3.5-27b",
-      "recommended_model_why": "Prefer a coding-focused model over generic defaults.",
+      "description": "Unified gateway with many model families and a stable OpenAI-compatible API.",
       "setup_hint": "Best for users who want one key and the ability to switch between many coding-capable models.",
-      "signup_url": "https://openrouter.ai/keys"
-    },
-    {
-      "api_key_help": "Create a key, then choose a current coding or reasoning model from the provider list.",
-      "api_key_label": "DeepInfra API Key",
-      "default_model": "deepseek-ai/DeepSeek-V3.1-Terminus",
-      "description": "Hosted inference for open models through a straightforward API.",
-      "docs_url": "https://deepinfra.com/",
-      "id": "deepinfra",
-      "models": [],
-      "name": "DeepInfra",
+      "docs_url": "https://openrouter.ai/",
+      "signup_url": "https://openrouter.ai/keys",
+      "api_key_label": "OpenRouter API Key",
+      "api_key_help": "Choose a coding-capable model after connecting your key.",
       "recommended": true,
-      "recommended_model": "deepseek-ai/DeepSeek-V3.1-Terminus",
-      "recommended_model_why": "Good default for coding-oriented open-model inference.",
-      "setup_hint": "Good fit when you want open-model access without self-hosting.",
-      "signup_url": "https://deepinfra.com/dash/api_keys"
+      "default_model": "qwen/qwen3.5-27b",
+      "recommended_model": "qwen/qwen3.5-27b",
+      "recommended_model_why": "Prefer a coding-focused model over generic defaults."
     },
     {
-      "api_key_help": "Create a Chutes key, then pick one of the available coding-capable models.",
-      "api_key_label": "Chutes API Key",
-      "default_model": "qwen/qwen3.5-27b",
-      "description": "Hosted inference with strong open-model coverage and simple setup.",
-      "docs_url": "https://chutes.ai/",
+      "id": "deepinfra",
+      "name": "DeepInfra",
+      "description": "Hosted inference for open models through a straightforward API.",
+      "setup_hint": "Good fit when you want open-model access without self-hosting.",
+      "docs_url": "https://deepinfra.com/",
+      "signup_url": "https://deepinfra.com/dash/api_keys",
+      "api_key_label": "DeepInfra API Key",
+      "api_key_help": "Create a key, then choose a current coding or reasoning model from the provider list.",
+      "recommended": true,
+      "default_model": "deepseek-ai/DeepSeek-V3.1-Terminus",
+      "recommended_model": "deepseek-ai/DeepSeek-V3.1-Terminus",
+      "recommended_model_why": "Good default for coding-oriented open-model inference."
+    },
+    {
       "id": "chutes",
+      "name": "Chutes",
+      "description": "Hosted inference with strong open-model coverage and simple setup.",
+      "setup_hint": "Use Chutes when you want hosted access to open models with a lightweight workflow.",
+      "docs_url": "https://chutes.ai/",
+      "signup_url": "https://chutes.ai/",
+      "api_key_label": "Chutes API Key",
+      "api_key_help": "Create a Chutes key, then pick one of the available coding-capable models.",
+      "recommended": true,
+      "default_model": "qwen/qwen3.5-27b",
+      "recommended_model": "qwen/qwen3.5-27b",
+      "recommended_model_why": "Current coding/reasoning default from the checked-in Chutes catalog.",
       "models": [
         {
-          "context_length": 64000,
           "id": "deepseek-ai/DeepSeek-R1-0528",
           "name": "DeepSeek R1 0528",
+          "context_length": 64000,
           "tags": [
             "coding",
             "reasoning"
           ]
         },
         {
-          "context_length": 64000,
           "id": "deepseek-ai/DeepSeek-V3",
           "name": "DeepSeek V3",
+          "context_length": 64000,
           "tags": [
             "coding",
             "tools"
           ]
         }
-      ],
-      "name": "Chutes",
-      "recommended": true,
-      "recommended_model": "qwen/qwen3.5-27b",
-      "recommended_model_why": "Current coding/reasoning default from the checked-in Chutes catalog.",
-      "setup_hint": "Use Chutes when you want hosted access to open models with a lightweight workflow.",
-      "signup_url": "https://chutes.ai/"
+      ]
     },
     {
-      "api_key_help": "Only configure this if you explicitly want it.",
-      "api_key_label": "OpenAI API Key",
-      "default_model": "gpt-5-mini",
-      "description": "General-purpose hosted model provider.",
-      "docs_url": "https://platform.openai.com/docs",
       "id": "openai",
-      "models": [],
       "name": "OpenAI",
-      "recommended": false,
-      "recommended_model": "gpt-5-mini",
-      "recommended_model_why": "Fallback provider entry only.",
+      "description": "General-purpose hosted model provider.",
       "setup_hint": "Available, but not recommended as the first onboarding suggestion in this app.",
-      "signup_url": "https://platform.openai.com/api-keys"
+      "docs_url": "https://platform.openai.com/docs",
+      "signup_url": "https://platform.openai.com/api-keys",
+      "api_key_label": "OpenAI API Key",
+      "api_key_help": "Only configure this if you explicitly want it.",
+      "default_model": "gpt-5-mini",
+      "recommended_model": "gpt-5-mini",
+      "recommended_model_why": "Fallback provider entry only."
     }
-  ],
-  "source": "repo",
-  "updated_at": "2026-03-27T12:00:00Z"
+  ]
 }
