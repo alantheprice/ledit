@@ -2,6 +2,22 @@
 
 All notable changes to ledit will be documented in this file.
 
+## [v0.15.4] - 2026-04-18
+
+- Updates 3 files - Updates context limit error handling and detection (acae80df)
+- Updates 2 files - Updates onboarding persistence and terminal auto-focus (fc3b5f93)
+- Updates 5 files - Updates context panel collapse behavior and refactors TS scripts (c8a58b4e)
+- Updates 19 files - Updates semantic LSP integration for Go and TypeScript (e4e89d7a)
+- Updates 13 files - Updates hotkeys, chat recovery, and command palette display (095a6caa)
+- Updates 4 files - Updates prefill handling for thinking mode compatibility (58a17dca)
+- Updates 4 files - Updates desktop smoke test infrastructure (f66aa207)
+- Updates 4 files - Updates desktop context panel toggle button (0e78e036)
+- Updates 2 files - Updates chat memoization and copy button pointer events (ef75999b)
+- Updates 14 files - Updates HTTP error handling and terminal improvements (08bc09c5)
+- Merge remote-tracking branch 'origin' (29778377)
+- Updates 3 files - Updates CI workflows and refactors script logging format (829a4b30)
+- docs: Update changelog for v0.15.3 (7091d4f1)
+
 ## [v0.15.3] - 2026-04-17
 
 - Updates package.json - Updates dependencies in package.json (88c18019)
